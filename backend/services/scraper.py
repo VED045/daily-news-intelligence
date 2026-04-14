@@ -7,6 +7,8 @@ Rules:
  - Sports (ESPN / BBC Sport / TOI Sports): max 2 articles per feed, capped at 10% of total
  - Finance: dedicated category from financial RSS feeds
  - Content: extract up to 1000 chars per article for quality summaries
+ - content_preview: 5-6 sentences extracted from <p> tags (BeautifulSoup)
+ - source_type: "rss" for all scraped articles
 """
 import feedparser
 import requests
@@ -116,7 +118,7 @@ def _normalize_category(cat: str) -> str:
 def _extract_rich_content(entry) -> str:
     """
     Extract the richest available text: prefer full content > summary > title.
-    Returns up to 1000 chars of plain text.
+    Returns up to 1000 chars of plain text. Used as the article 'summary'.
     """
     text = ""
 
@@ -138,6 +140,56 @@ def _extract_rich_content(entry) -> str:
         text = " ".join(soup.get_text(separator=" ").split())
 
     return text[:1000]
+
+
+def _extract_content_preview(entry) -> str:
+    """
+    Extract 5-6 lines of actual article content from <p> tags.
+    This is separate from summary — used for the content_preview field.
+    Falls back to summary text if no <p> tags found.
+    Returns plain text, HTML-cleaned.
+    """
+    raw_html = ""
+
+    # Try full content (HTML body)
+    if hasattr(entry, "content") and entry.content:
+        for c in entry.content:
+            v = c.get("value", "")
+            if v:
+                raw_html = v
+                break
+
+    # Fall back to summary HTML
+    if not raw_html and hasattr(entry, "summary"):
+        raw_html = entry.summary or ""
+
+    if not raw_html:
+        return ""
+
+    try:
+        soup = BeautifulSoup(raw_html, "html.parser")
+        paragraphs = soup.find_all("p")
+
+        if paragraphs:
+            # Extract text from first 6 <p> tags, skip empty ones
+            sentences = []
+            for p in paragraphs:
+                text = p.get_text(separator=" ").strip()
+                # Skip very short or navigation-like snippets
+                if text and len(text) > 30:
+                    sentences.append(text)
+                if len(sentences) >= 6:
+                    break
+            if sentences:
+                preview = " ".join(sentences)
+                return preview[:1500]
+
+        # No <p> tags found — fall back to plain text from entire content
+        text = " ".join(soup.get_text(separator=" ").split())
+        return text[:800]
+
+    except Exception:
+        return ""
 
 
 async def scrape_all_feeds() -> Dict[str, int]:
@@ -180,6 +232,7 @@ async def scrape_all_feeds() -> Dict[str, int]:
 
                 title = entry.get("title", "Untitled").strip()
                 summary = _extract_rich_content(entry)
+                content_preview = _extract_content_preview(entry)
 
                 # Category detection: tag → default
                 category = default_category
@@ -198,6 +251,8 @@ async def scrape_all_feeds() -> Dict[str, int]:
                     "category": _normalize_category(category),
                     "published_at": published,           # UTC datetime with tz
                     "summary": summary,
+                    "content_preview": content_preview,  # 5-6 lines from <p> tags
+                    "source_type": "rss",                # "rss" for all scraped articles
                     "ai_title": None,
                     "ai_summary": None,
                     "keywords": [],

@@ -9,8 +9,10 @@ Full hybrid pipeline:
   5. AI processing       → only top MAX_AI_ARTICLES sent to Gemini
   6. Curation            → Top 5 highlights
   7. Trends              → daily analytics
-  8. Email digest        → send to subscribers
+  8. Meta update         → record lastFetchedAt timestamp
+  9. Email digest        → send to subscribers
 
+Triggered by: /fetch-news endpoint (also /trigger-pipeline alias) and scheduler.
 Clean summary log emitted at the end of every run.
 """
 import asyncio
@@ -223,14 +225,22 @@ async def run_full_pipeline() -> Dict:
 
     # ── Step 7: Trends ────────────────────────────────────────────
     try:
-        logger.info("📊 [6/6] Computing trends...")
+        logger.info("📊 [6/7] Computing trends...")
         from services.trends_service import compute_trends
         await compute_trends()
     except Exception as e:
         logger.error(f"     Trends failed: {e}")
         summary["errors"].append(f"trends: {e}")
 
-    # ── Step 8: Email ─────────────────────────────────────────────
+    # ── Step 8: Update fetch metadata ─────────────────────────────
+    try:
+        logger.info("🕒 [7/7] Updating fetch metadata...")
+        from routes.meta import update_last_fetched
+        await update_last_fetched()
+    except Exception as e:
+        logger.warning(f"     Meta update failed (non-fatal): {e}")
+
+    # ── Step 9: Email ─────────────────────────────────────────────
     try:
         from services.email_service import send_daily_digest
         await send_daily_digest()
@@ -242,9 +252,14 @@ async def run_full_pipeline() -> Dict:
 
     logger.info("=" * 60)
     logger.info(f"✅ Pipeline complete ({elapsed}s)")
-    logger.info(f"   scraped={summary['scraped']} news_api={summary['news_api']} "
-                f"merged={summary['merged_total']} dedup_removed={summary['deduplicated_removed']} "
-                f"ai_processed={summary['ai_processed']} ai_failed={summary['ai_failed']}")
+    logger.info(
+        f"   scraped={summary['scraped']} "
+        f"news_api={summary['news_api']} "
+        f"merged={summary['merged_total']} "
+        f"dedup_removed={summary['deduplicated_removed']} "
+        f"ai_processed={summary['ai_processed']} "
+        f"failed={summary['ai_failed']}"
+    )
     if summary["errors"]:
         logger.warning(f"   Errors: {summary['errors']}")
     logger.info("=" * 60)

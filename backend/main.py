@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import connect_db, close_db
-from routes import news, top5, trends, subscription, search
+from routes import news, top5, trends, subscription, search, bookmarks, meta
 from scheduler.jobs import start_scheduler, stop_scheduler
 
 logging.basicConfig(
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Dainik-Vidya API",
     description="Hybrid RSS + NewsAPI news aggregation with Gemini AI",
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan,
 )
 
@@ -54,24 +54,41 @@ app.include_router(top5.router,         prefix="/top5",       tags=["Top 5"])
 app.include_router(trends.router,       prefix="/trends",     tags=["Trends"])
 app.include_router(subscription.router,                       tags=["Subscription"])
 app.include_router(search.router,       prefix="/search",     tags=["Search"])
+app.include_router(bookmarks.router,    prefix="/bookmark",   tags=["Bookmarks"])
+app.include_router(meta.router,         prefix="/meta",       tags=["Meta"])
 
 
 @app.get("/", tags=["Health"])
 async def root():
-    return {"status": "ok", "app": "Dainik-Vidya", "version": "2.0.0"}
+    return {"status": "ok", "app": "Dainik-Vidya", "version": "2.1.0"}
 
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    return {"status": "healthy", "version": "2.0.0"}
+    return {"status": "healthy", "version": "2.1.0"}
+
+
+async def _run_pipeline_task():
+    """Shared pipeline runner used by both trigger endpoints."""
+    from services.pipeline import run_full_pipeline
+    import asyncio
+    asyncio.create_task(run_full_pipeline())
+
+
+@app.post("/fetch-news", tags=["Admin"])
+async def fetch_news():
+    """Manually trigger the full hybrid pipeline (RSS + NewsAPI + AI). Fetch Latest News."""
+    await _run_pipeline_task()
+    return {
+        "message": "Fetching latest news in background",
+        "steps": ["rss_scrape", "news_api", "dedup", "ai_rank", "curate", "trends", "email"],
+    }
 
 
 @app.post("/trigger-pipeline", tags=["Admin"])
 async def trigger_pipeline():
-    """Manually trigger the full hybrid pipeline (RSS + NewsAPI + AI)."""
-    from services.pipeline import run_full_pipeline
-    import asyncio
-    asyncio.create_task(run_full_pipeline())
+    """Backward-compat alias for /fetch-news."""
+    await _run_pipeline_task()
     return {
         "message": "Hybrid pipeline triggered in background",
         "steps": ["rss_scrape", "news_api", "dedup", "ai_rank", "curate", "trends", "email"],
@@ -91,3 +108,10 @@ async def pipeline_status():
         "processed": processed,
         "unprocessed": unprocessed,
     }
+
+# Also expose GET /bookmarks (list all) at a clean path
+@app.get("/bookmarks", tags=["Bookmarks"])
+async def get_bookmarks_alias():
+    """Alias: GET /bookmarks — returns all saved bookmarks."""
+    from routes.bookmarks import get_bookmarks
+    return await get_bookmarks()

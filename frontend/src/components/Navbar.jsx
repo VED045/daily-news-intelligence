@@ -2,17 +2,18 @@ import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTheme, APP_NAME } from '../App'
 import {
-  Newspaper, BarChart3, Star, Mail,
+  Newspaper, BarChart3, Star, Mail, Bookmark,
   Sun, Moon, Menu, X, Zap, RefreshCw
 } from 'lucide-react'
-import { triggerPipeline } from '../services/api'
+import { fetchLatestNews } from '../services/api'
 import toast from 'react-hot-toast'
 
 const NAV_LINKS = [
-  { to: '/',          label: 'Dashboard',  icon: Star },
-  { to: '/news',      label: 'News Feed',  icon: Newspaper },
-  { to: '/trends',    label: 'Trends',     icon: BarChart3 },
-  { to: '/subscribe', label: 'Subscribe',  icon: Mail },
+  { to: '/',           label: 'Dashboard',  icon: Star },
+  { to: '/news',       label: 'News Feed',  icon: Newspaper },
+  { to: '/bookmarks',  label: 'Bookmarks',  icon: Bookmark },
+  { to: '/trends',     label: 'Trends',     icon: BarChart3 },
+  { to: '/subscribe',  label: 'Subscribe',  icon: Mail },
 ]
 
 export default function Navbar() {
@@ -31,8 +32,8 @@ export default function Navbar() {
   const handleTrigger = async () => {
     setRunning(true)
     try {
-      await triggerPipeline()
-      toast.success('Pipeline triggered! Check back in ~2 minutes.')
+      await fetchLatestNews()
+      toast.success('Fetching latest news! Check back in ~2 minutes.')
     } catch {
       toast.error('Could not reach the backend.')
     } finally {
@@ -74,7 +75,8 @@ export default function Navbar() {
           <button
             onClick={handleTrigger}
             disabled={running}
-            title="Trigger news pipeline manually"
+            title="Fetch latest news manually"
+            id="fetch-news-btn"
             className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all
               ${running
                 ? 'border-primary-500/40 text-primary-400 bg-primary-500/10 cursor-not-allowed'
@@ -84,7 +86,7 @@ export default function Navbar() {
               }`}
           >
             <RefreshCw size={13} className={running ? 'animate-spin' : ''} />
-            {running ? 'Running…' : 'Run Pipeline'}
+            {running ? 'Fetching…' : 'Fetch Latest News'}
           </button>
 
           <button
@@ -121,7 +123,7 @@ export default function Navbar() {
             </Link>
           ))}
           <button onClick={handleTrigger} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium ${linkInactive}`}>
-            <RefreshCw size={16} />Run Pipeline
+            <RefreshCw size={16} />Fetch Latest News
           </button>
         </div>
       )}

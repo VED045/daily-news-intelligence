@@ -38,9 +38,16 @@ def _serialize(doc: dict) -> dict:
             doc[field] = val.isoformat() if val.tzinfo else val.isoformat() + "Z"
 
     # Alias publishedAt for frontend compatibility
-    doc["publishedAt"] = doc.get("published_at")
-    doc["imageUrl"]    = doc.get("image_url")
+    doc["publishedAt"]     = doc.get("published_at")
+    doc["imageUrl"]        = doc.get("image_url")
     doc["importanceScore"] = doc.get("importance_score")
+
+    # Source type: "News API" for newsapi.org articles, "Scraped" for RSS
+    raw_st = doc.get("source_type", "rss")
+    doc["sourceType"] = "News API" if raw_st == "newsapi" else "Scraped"
+
+    # Content preview (5-6 lines of article body)
+    doc["contentPreview"] = doc.get("content_preview", "")
 
     return doc
 

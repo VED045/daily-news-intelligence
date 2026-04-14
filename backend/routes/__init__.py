@@ -1,3 +1,3 @@
-from routes import news, top5, trends, subscription, search
+from routes import news, top5, trends, subscription, search, bookmarks, meta
 
-__all__ = ["news", "top5", "trends", "subscription", "search"]
+__all__ = ["news", "top5", "trends", "subscription", "search", "bookmarks", "meta"]

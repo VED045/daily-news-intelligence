@@ -31,8 +31,27 @@ export const subscribe = (email, name = '') =>
 export const unsubscribe = (email) =>
   api.delete('/unsubscribe', { params: { email } }).then(r => r.data)
 
-// ─── Pipeline ────────────────────────────────────────────────
+// ─── Pipeline / Fetch News ───────────────────────────────────
 export const triggerPipeline = () =>
-  api.post('/trigger-pipeline').then(r => r.data)
+  api.post('/fetch-news').then(r => r.data)
+
+export const fetchLatestNews = () =>
+  api.post('/fetch-news').then(r => r.data)
+
+// ─── Meta ────────────────────────────────────────────────────
+export const getMeta = () => api.get('/meta').then(r => r.data)
+
+// ─── Bookmarks ───────────────────────────────────────────────
+export const getBookmarks = () =>
+  api.get('/bookmarks').then(r => r.data)
+
+export const addBookmark = (articleId) =>
+  api.post('/bookmark', { articleId }).then(r => r.data)
+
+export const removeBookmark = (bookmarkId) =>
+  api.delete(`/bookmark/${bookmarkId}`).then(r => r.data)
+
+export const removeBookmarkByArticle = (articleId) =>
+  api.delete(`/bookmark/article/${articleId}`).then(r => r.data)
 
 export default api

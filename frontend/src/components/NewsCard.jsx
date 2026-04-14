@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
-import { ExternalLink, Bookmark, BookmarkCheck, Tag, Clock } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { ExternalLink, Bookmark, BookmarkCheck, Tag, Clock, Rss, Globe } from 'lucide-react'
 import { useTheme } from '../App'
+import { addBookmark, removeBookmarkByArticle } from '../services/api'
+import toast from 'react-hot-toast'
 
 // ── Priority order: politics first, sports last ──────────────
 const CATEGORY_COLORS = {
@@ -53,27 +55,76 @@ function formatTime(isoString) {
   })
 }
 
-export default function NewsCard({ article, onKeywordClick }) {
+export default function NewsCard({ article, onKeywordClick, bookmarkId: initialBookmarkId, onUnbookmark }) {
   const { dark } = useTheme()
   const [bookmarked, setBookmarked] = useState(() => {
-    const saved = JSON.parse(localStorage.getItem('dv-bookmarks') || '[]')
-    return saved.includes(article._id || article.url)
+    if (initialBookmarkId) return true
+    const saved = JSON.parse(localStorage.getItem('dv-bookmarks') || '{}')
+    return !!saved[article._id || article.url]
   })
+  const [bmId, setBmId] = useState(initialBookmarkId || null)
 
-  const toggleBookmark = (e) => {
+  // Sync local storage bookmark map on mount
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem('dv-bookmarks') || '{}')
+    const key = article._id || article.url
+    if (saved[key]) {
+      setBookmarked(true)
+      setBmId(saved[key])
+    }
+  }, [article._id, article.url])
+
+  const toggleBookmark = async (e) => {
     e.preventDefault()
     const key = article._id || article.url
-    const saved = JSON.parse(localStorage.getItem('dv-bookmarks') || '[]')
-    const updated = bookmarked ? saved.filter(id => id !== key) : [...saved, key]
-    localStorage.setItem('dv-bookmarks', JSON.stringify(updated))
-    setBookmarked(!bookmarked)
+
+    if (bookmarked) {
+      // Remove
+      try {
+        await removeBookmarkByArticle(article._id)
+        const saved = JSON.parse(localStorage.getItem('dv-bookmarks') || '{}')
+        delete saved[key]
+        localStorage.setItem('dv-bookmarks', JSON.stringify(saved))
+        setBookmarked(false)
+        setBmId(null)
+        toast.success('Bookmark removed')
+        onUnbookmark?.(article._id)
+      } catch {
+        // Fallback: just remove from localStorage
+        const saved = JSON.parse(localStorage.getItem('dv-bookmarks') || '{}')
+        delete saved[key]
+        localStorage.setItem('dv-bookmarks', JSON.stringify(saved))
+        setBookmarked(false)
+        toast('Bookmark removed (offline)')
+      }
+    } else {
+      // Add
+      try {
+        const res = await addBookmark(article._id)
+        const saved = JSON.parse(localStorage.getItem('dv-bookmarks') || '{}')
+        saved[key] = res.id || true
+        localStorage.setItem('dv-bookmarks', JSON.stringify(saved))
+        setBmId(res.id)
+        setBookmarked(true)
+        toast.success('Article bookmarked!')
+      } catch {
+        // Fallback: save to localStorage only
+        const saved = JSON.parse(localStorage.getItem('dv-bookmarks') || '{}')
+        saved[key] = true
+        localStorage.setItem('dv-bookmarks', JSON.stringify(saved))
+        setBookmarked(true)
+        toast('Bookmarked (offline)')
+      }
+    }
   }
 
   const catDef = CATEGORY_COLORS[article.category] || CATEGORY_COLORS.general
   const catColor = dark ? catDef.dark : catDef.light
   const displayTitle = article.ai_title || article.title
   const displaySummary = article.ai_summary || article.summary
-  const timeLabel = formatTime(article.published_at)
+  const contentPreview = article.contentPreview || article.content_preview || ''
+  const timeLabel = formatTime(article.published_at || article.publishedAt)
+  const sourceType = article.sourceType || (article.source_type === 'newsapi' ? 'News API' : 'Scraped')
 
   // Card styles for light/dark
   const cardBase = dark
@@ -83,12 +134,21 @@ export default function NewsCard({ article, onKeywordClick }) {
   return (
     <article className={cardBase}>
 
-      {/* Header row */}
+      {/* Header row: category + source type + time + bookmark */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`badge ${catColor}`}>
             <Tag size={10} />
             {article.category}
+          </span>
+          {/* Source type badge */}
+          <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-medium
+            ${sourceType === 'News API'
+              ? (dark ? 'bg-blue-500/15 text-blue-400' : 'bg-blue-50 text-blue-600 border border-blue-200')
+              : (dark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-50 text-emerald-700 border border-emerald-200')
+            }`}>
+            {sourceType === 'News API' ? <Globe size={10} /> : <Rss size={10} />}
+            {sourceType}
           </span>
           <span className={`text-xs font-medium ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
             {article.source}
@@ -103,7 +163,7 @@ export default function NewsCard({ article, onKeywordClick }) {
           <button
             onClick={toggleBookmark}
             className={`p-1.5 rounded-lg transition-colors ml-1 ${dark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
-            title={bookmarked ? 'Remove bookmark' : 'Bookmark'}
+            title={bookmarked ? 'Remove bookmark' : 'Bookmark this article'}
           >
             {bookmarked
               ? <BookmarkCheck size={16} className="text-primary-500" />
@@ -112,18 +172,29 @@ export default function NewsCard({ article, onKeywordClick }) {
         </div>
       </div>
 
-      {/* Title */}
-      <h3 className={`font-semibold text-sm leading-snug line-clamp-2 group-hover:text-primary-500 transition-colors
+      {/* Title — clickable link */}
+      <h3 className={`font-semibold text-sm leading-snug line-clamp-2 transition-colors
         ${dark ? 'text-slate-100' : 'text-slate-800'}`}>
-        {displayTitle}
+        <a
+          href={article.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-primary-500 transition-colors"
+        >
+          {displayTitle}
+        </a>
       </h3>
 
-      {/* Summary */}
-      {displaySummary && (
+      {/* Content preview (5-6 lines from article body) */}
+      {contentPreview ? (
+        <p className={`text-xs leading-relaxed line-clamp-4 ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+          {contentPreview}
+        </p>
+      ) : displaySummary ? (
         <p className={`text-xs leading-relaxed line-clamp-3 ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
           {displaySummary}
         </p>
-      )}
+      ) : null}
 
       {/* Keywords — clickable */}
       {article.keywords?.length > 0 && (
@@ -143,7 +214,7 @@ export default function NewsCard({ article, onKeywordClick }) {
         </div>
       )}
 
-      {/* Read link */}
+      {/* Read full article link */}
       <a
         href={article.url}
         target="_blank"

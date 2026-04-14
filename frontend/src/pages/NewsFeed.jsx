@@ -176,7 +176,7 @@ export default function NewsFeed() {
           <Newspaper size={48} className="mx-auto mb-4 opacity-20" />
           <p className={`text-lg font-medium mb-1 ${dark ? 'text-slate-400' : 'text-slate-500'}`}>No articles found</p>
           <p className={`text-sm ${dark ? 'text-slate-600' : 'text-slate-400'}`}>
-            {isSearchMode ? `No results for "${searchQuery}". Try another term.` : 'Run the pipeline in the navbar to fetch today\'s news.'}
+            {isSearchMode ? `No results for "${searchQuery}". Try another term.` : 'Click "Fetch Latest News" in the navbar to get today\'s headlines.'}
           </p>
         </div>
       )}

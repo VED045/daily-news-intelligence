@@ -1,15 +1,9 @@
 """
-AI Processor — Dainik-Vidya
-Uses Google Gemini Flash to generate summaries, category tags,
-importance scores, and keywords for top-ranked articles ONLY.
-
-Optimisations:
-  • Only processes the N articles passed in (pre-ranked by pipeline)
-  • Skips already-processed articles (cache)
-  • Semaphore-based concurrency cap (max 4 parallel Gemini calls)
-  • Retry with back-off (max 2 retries per article)
-  • Rate-limit delay between calls
-  • Clean summary log — no per-article Gemini noise
+AI Processor — Dainik-Vidya (v2.1)
+— Gemini 404 fix: runtime model probe + fallback
+— Only processes top 10-15 ranked articles (passed from pipeline)
+— Semaphore rate-limit, 2-retry backoff, cache skip
+— Never crashes pipeline on Gemini failure
 """
 import json
 import asyncio
@@ -22,30 +16,97 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-# ── Gemini setup ──────────────────────────────────────────────────────────────
+# ── Gemini initialisation ─────────────────────────────────────────────────────
+_gemini_ok   = False
+_model       = None
+MOCK_MODE    = True
+_ACTIVE_MODEL = None   # actual model name that worked
+
 try:
     import google.generativeai as genai
     _gemini_ok = True
 except ImportError:
-    _gemini_ok = False
-    logger.warning("google-generativeai not installed — running in mock mode")
+    logger.warning("google-generativeai not installed — AI running in mock mode")
 
-MOCK_MODE = not settings.gemini_api_key or not _gemini_ok
+def _init_gemini():
+    """
+    Probe Gemini at startup:
+      1. Configure API key
+      2. List available models, log them
+      3. Pick the first model that supports generateContent
+      4. Fail gracefully → MOCK_MODE = True
+    """
+    global _model, MOCK_MODE, _ACTIVE_MODEL
 
-if not MOCK_MODE:
-    genai.configure(api_key=settings.gemini_api_key)
-    _model = genai.GenerativeModel(
-        model_name=settings.gemini_model,       # default: "gemini-1.5-flash"
-        generation_config=genai.types.GenerationConfig(
-            temperature=0.25,
-            max_output_tokens=350,
-        ),
-    )
+    if not _gemini_ok or not settings.gemini_api_key:
+        logger.warning("Gemini: no API key or SDK missing — mock mode active")
+        MOCK_MODE = True
+        return
 
-# Semaphore: max 4 concurrent Gemini calls to stay within RPM
-_SEM = asyncio.Semaphore(4)
-# Delay between each call (seconds) to stay within free-tier RPM
-_CALL_DELAY = 60.0 / settings.gemini_rpm
+    try:
+        genai.configure(api_key=settings.gemini_api_key)
+
+        # ── List available models ─────────────────────────────────
+        try:
+            available = [
+                m.name for m in genai.list_models()
+                if "generateContent" in (m.supported_generation_methods or [])
+            ]
+            logger.info(f"Gemini available models: {available}")
+        except Exception as probe_err:
+            logger.warning(f"Gemini: could not list models — {probe_err}")
+            available = []
+
+        # ── Model preference list ─────────────────────────────────
+        candidates = [
+            settings.gemini_model,       # env default: "gemini-1.5-flash"
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-latest",
+            "gemini-1.5-pro",
+            "gemini-pro",
+        ]
+        # If we got a model list, filter to only available ones (strip "models/" prefix)
+        available_short = [m.replace("models/", "") for m in available]
+        ordered = [c for c in candidates if not available_short or c in available_short]
+        if not ordered:
+            ordered = candidates   # fallback: try anyway
+
+        last_err = None
+        for candidate in ordered:
+            try:
+                m = genai.GenerativeModel(
+                    model_name=candidate,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.25,
+                        max_output_tokens=350,
+                    ),
+                )
+                # Quick smoke test — list_models already validated, skip extra call
+                _model        = m
+                _ACTIVE_MODEL = candidate
+                MOCK_MODE     = False
+                logger.info(f"✅ Gemini model ready: {candidate}")
+                return
+            except Exception as e:
+                last_err = e
+                logger.debug(f"Gemini model '{candidate}' init failed: {e}")
+                continue
+
+        logger.error(f"Gemini: all model candidates failed. Last error: {last_err}")
+        logger.warning("Falling back to mock AI mode — pipeline will continue without summaries")
+        MOCK_MODE = True
+
+    except Exception as e:
+        logger.error(f"Gemini init error: {e} — mock mode active")
+        MOCK_MODE = True
+
+
+# Run probe at import time
+_init_gemini()
+
+# ── Rate control ──────────────────────────────────────────────────────────────
+_SEM        = asyncio.Semaphore(4)   # max 4 concurrent API calls
+_CALL_DELAY = 60.0 / max(settings.gemini_rpm, 1)   # seconds between calls
 
 _STOP_WORDS = frozenset({
     "the", "a", "an", "is", "in", "on", "at", "to", "for", "of", "and",
@@ -53,12 +114,12 @@ _STOP_WORDS = frozenset({
 })
 
 SYSTEM_PROMPT = """\
-You are a concise, professional news editor. Analyse the article snippet and return ONLY a valid JSON object:
+You are a concise, professional news editor. Analyse the article and return ONLY valid JSON:
 {
   "ai_title": "<clean, engaging headline, max 15 words>",
   "summary": "<2-3 sentence factual summary>",
   "category": "<one of: politics|geopolitics|business|finance|technology|health|science|world|india|sports|entertainment|general>",
-  "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>"],
+  "keywords": ["kw1", "kw2", "kw3", "kw4"],
   "importance_score": <integer 1-10 reflecting global significance>
 }
 Return ONLY the JSON. No markdown fences, no extra text."""
@@ -66,21 +127,27 @@ Return ONLY the JSON. No markdown fences, no extra text."""
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 async def _call_gemini(article: dict) -> Optional[dict]:
-    """Single Gemini call, wrapped in semaphore + delay."""
+    """Single Gemini call, guarded by semaphore + delay. Returns None on any error."""
+    if MOCK_MODE or _model is None:
+        return None
+
     prompt = (
         f"{SYSTEM_PROMPT}\n\n"
         f"Title: {article.get('title', '')}\n"
         f"Source: {article.get('source', '')}\n"
         f"Category hint: {article.get('category', '')}\n"
-        f"Snippet: {(article.get('summary') or '')[:400]}"
+        f"Snippet: {(article.get('content_preview') or article.get('summary') or '')[:500]}"
     )
     try:
         async with _SEM:
-            response = await asyncio.to_thread(_model.generate_content, prompt)
-            await asyncio.sleep(_CALL_DELAY)   # throttle within semaphore slot
+            response = await asyncio.wait_for(
+                asyncio.to_thread(_model.generate_content, prompt),
+                timeout=30.0,
+            )
+            await asyncio.sleep(_CALL_DELAY)
 
         text = response.text.strip()
-        # Strip markdown fences if present
+        # Strip markdown code fences if present
         if text.startswith("```"):
             parts = text.split("```")
             text = parts[1] if len(parts) > 1 else parts[0]
@@ -88,36 +155,45 @@ async def _call_gemini(article: dict) -> Optional[dict]:
                 text = text[4:]
 
         return json.loads(text.strip())
-    except json.JSONDecodeError:
+
+    except asyncio.TimeoutError:
+        logger.debug(f"Gemini timeout for: {article.get('title', '')[:50]}")
         return None
-    except Exception:
+    except json.JSONDecodeError:
+        logger.debug("Gemini: invalid JSON response")
+        return None
+    except Exception as e:
+        # Suppress repetitive 404 / quota noise — log once at debug level
+        logger.debug(f"Gemini call failed: {type(e).__name__}: {e}")
         return None
 
 
 async def _call_with_retry(article: dict, max_retries: int = 2) -> Optional[dict]:
-    """Retry Gemini call up to max_retries times with exponential back-off."""
+    """Retry logic with exponential back-off. Returns None after all retries fail."""
     for attempt in range(max_retries + 1):
         result = await _call_gemini(article)
         if result is not None:
             return result
         if attempt < max_retries:
-            await asyncio.sleep(2.0 ** attempt * 3)   # 3s, 6s
+            wait = 3.0 * (2 ** attempt)   # 3s, 6s
+            logger.debug(f"Gemini retry {attempt+1}/{max_retries} in {wait:.0f}s")
+            await asyncio.sleep(wait)
     return None
 
 
 def _mock_process(article: dict) -> dict:
-    """Mock result when no API key or in dev mode."""
+    """Deterministic mock when Gemini is unavailable."""
     title = article.get("title", "")
-    words = [
+    words = list({
         w.lower().strip(".,!?\"'")
         for w in title.split()
         if len(w) > 3 and w.lower() not in _STOP_WORDS and w.isalpha()
-    ]
+    })
     return {
-        "ai_title": title,
-        "summary": article.get("summary") or f"Full article available at {article.get('source', 'the source')}.",
-        "category": article.get("category", "general"),
-        "keywords": list(set(words))[:6],
+        "ai_title":        title,
+        "summary":         article.get("summary") or f"Full article at {article.get('source', 'source')}.",
+        "category":        article.get("category", "general"),
+        "keywords":        words[:5],
         "importance_score": 5,
     }
 
@@ -125,31 +201,29 @@ def _mock_process(article: dict) -> dict:
 # ── Public interface ──────────────────────────────────────────────────────────
 async def process_articles(articles: List[dict]) -> Dict[str, int]:
     """
-    Process a pre-selected list of articles (from pipeline.get_ranked_unprocessed).
-    Skips any that are already processed (cache).
-    Returns {"processed": N, "errors": M, "skipped_cached": K}.
+    Process a pre-ranked list of articles.
+    Skips already-processed ones (cache). Never crashes on Gemini failure.
     """
     collection = get_collection("news")
-    stats = {"processed": 0, "errors": 0, "skipped_cached": 0}
+    stats = {"processed": 0, "errors": 0, "skipped_cached": 0, "mock": 0}
 
-    if not articles:
-        return stats
-
-    # Filter out already-processed (cache hit)
     unprocessed = [a for a in articles if not a.get("processed")]
     stats["skipped_cached"] = len(articles) - len(unprocessed)
-
     if not unprocessed:
         return stats
 
-    logger.info(f"  Gemini processing {len(unprocessed)} articles (mock={MOCK_MODE})")
+    logger.info(f"  AI: processing {len(unprocessed)} articles "
+                f"(model={_ACTIVE_MODEL or 'mock'}, mock={MOCK_MODE})")
 
     async def _handle(article: dict):
         try:
             if MOCK_MODE:
                 result = _mock_process(article)
+                stats["mock"] += 1
             else:
                 result = await _call_with_retry(article) or _mock_process(article)
+                if result == _mock_process(article):   # fallback was used
+                    stats["mock"] += 1
 
             await collection.update_one(
                 {"_id": article["_id"]},
@@ -165,20 +239,15 @@ async def process_articles(articles: List[dict]) -> Dict[str, int]:
             )
             stats["processed"] += 1
         except Exception as e:
-            logger.debug(f"  Article processing error ({article.get('_id')}): {e}")
+            logger.debug(f"Article save error ({article.get('_id')}): {e}")
             stats["errors"] += 1
 
-    # Run all article handlers concurrently (Semaphore limits actual API calls)
     await asyncio.gather(*[_handle(a) for a in unprocessed])
     return stats
 
 
-# Backward-compat shim — previously called by the old scheduler directly
+# Backward-compat shim
 async def process_all_unprocessed() -> Dict[str, int]:
-    """
-    Legacy entry: process up to MAX_AI_ARTICLES from recent unprocessed pool.
-    Prefer calling via pipeline.run_full_pipeline().
-    """
     from services.pipeline import get_ranked_unprocessed
     ranked = await get_ranked_unprocessed(settings.max_ai_articles)
     return await process_articles(ranked)

@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import NewsFeed from './pages/NewsFeed'
 import Trends from './pages/Trends'
 import Subscribe from './pages/Subscribe'
+import Bookmarks from './pages/Bookmarks'
 
 export const ThemeContext = createContext({ dark: true, toggle: () => {} })
 export const useTheme = () => useContext(ThemeContext)
@@ -33,6 +34,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/news" element={<NewsFeed />} />
+              <Route path="/bookmarks" element={<Bookmarks />} />
               <Route path="/trends" element={<Trends />} />
               <Route path="/subscribe" element={<Subscribe />} />
             </Routes>
