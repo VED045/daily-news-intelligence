@@ -4,17 +4,22 @@ const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const api = axios.create({ baseURL: BASE, timeout: 15000 })
 
-// ─── News ───────────────────────────────────────────────────
-export const getNews = (category = '', page = 1, limit = 20) =>
-  api.get('/news', { params: { category: category || undefined, page, limit } }).then(r => r.data)
+// ─── News ─────────────────────────────────────────────────────
+export const getNews = (category = '', page = 1, limit = 10, topic = '') =>
+  api.get('/news', { params: {
+    category: category || undefined,
+    page,
+    limit,
+    topic: topic || undefined,
+  }}).then(r => r.data)
 
 export const searchNews = (q, page = 1) =>
   api.get('/search', { params: { q, page } }).then(r => r.data)
 
-// ─── Top 5 ──────────────────────────────────────────────────
+// ─── Top 5 ────────────────────────────────────────────────────
 export const getTop5 = () => api.get('/top5').then(r => r.data)
 
-// ─── Trends ─────────────────────────────────────────────────
+// ─── Trends ──────────────────────────────────────────────────
 export const getTrends = () => api.get('/trends').then(r => r.data)
 export const getTrendHistory = (days = 7) =>
   api.get('/trends/history', { params: { days } }).then(r => r.data)
@@ -26,7 +31,7 @@ export const subscribe = (email, name = '') =>
 export const unsubscribe = (email) =>
   api.delete('/unsubscribe', { params: { email } }).then(r => r.data)
 
-// ─── Pipeline trigger (dev) ──────────────────────────────────
+// ─── Pipeline ────────────────────────────────────────────────
 export const triggerPipeline = () =>
   api.post('/trigger-pipeline').then(r => r.data)
 

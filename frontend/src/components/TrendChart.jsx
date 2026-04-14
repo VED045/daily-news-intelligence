@@ -57,7 +57,7 @@ export function CategoryBarChart({ data }) {
 }
 
 // ─── Keywords Word Cloud (tag list) ─────────────────────────
-export function KeywordCloud({ keywords }) {
+export function KeywordCloud({ keywords, onKeywordClick }) {
   if (!keywords?.length) return (
     <div className="flex items-center justify-center h-24 text-slate-500 text-sm">
       No keyword data yet
@@ -71,20 +71,23 @@ export function KeywordCloud({ keywords }) {
         const size = 11 + Math.round((count / max) * 10)
         const opacity = 0.4 + (count / max) * 0.6
         return (
-          <span
+          <button
             key={word}
+            onClick={() => onKeywordClick?.(word)}
             style={{ fontSize: size, opacity }}
             className="px-3 py-1 rounded-full bg-primary-500/10 text-primary-300 border border-primary-500/20
-              hover:bg-primary-500/20 hover:opacity-100 transition-all cursor-default"
+              hover:bg-primary-500/25 hover:opacity-100 transition-all cursor-pointer active:scale-95"
+            title={`Filter news by "${word}" (${count} mentions)`}
           >
             {word}
             <span className="ml-1 text-primary-500/60 text-[10px]">{count}</span>
-          </span>
+          </button>
         )
       })}
     </div>
   )
 }
+
 
 // ─── Mini stat bar ────────────────────────────────────────────
 export function StatBar({ label, value, max, color = '#6366f1' }) {

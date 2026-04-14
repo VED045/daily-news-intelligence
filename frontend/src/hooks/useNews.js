@@ -8,7 +8,6 @@ export function useNews(category = '') {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const prevCategory = useRef(category)
-
   // Reset when category changes
   useEffect(() => {
     if (prevCategory.current !== category) {
