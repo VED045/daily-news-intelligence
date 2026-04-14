@@ -9,7 +9,7 @@ load_dotenv()
 
 class Settings:
     mongodb_uri: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017/dailynews")
-    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     smtp_host: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
     smtp_user: str = os.getenv("SMTP_USER", "")

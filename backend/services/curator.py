@@ -1,7 +1,8 @@
 """
-Curator service: selects Top 5 most important stories using AI.
+Curator service: selects Top 5 most important stories using Gemini Flash.
 """
 import json
+import asyncio
 import logging
 from datetime import datetime, date
 from typing import Dict, List
@@ -11,22 +12,29 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 try:
-    from openai import AsyncOpenAI
-    _openai_available = True
+    import google.generativeai as genai
+    _gemini_available = True
 except ImportError:
-    _openai_available = False
+    _gemini_available = False
 
-MOCK_MODE = not settings.openai_api_key or not _openai_available
+MOCK_MODE = not settings.gemini_api_key or not _gemini_available
 
 if not MOCK_MODE:
-    _client = AsyncOpenAI(api_key=settings.openai_api_key)
+    genai.configure(api_key=settings.gemini_api_key)
+    _model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        generation_config=genai.types.GenerationConfig(
+            temperature=0.2,
+            max_output_tokens=2000,
+        ),
+    )
 
 CURATOR_PROMPT = """You are a senior international news editor.
 Given today's news headlines, select the 5 most globally important stories.
 Prioritize: geopolitics, major world events, economic impact, policy changes.
 De-prioritize: celebrity news, minor local stories.
 
-Return ONLY a JSON object:
+Return ONLY a valid JSON object (no markdown fences):
 {
   "top5": [
     {
@@ -54,7 +62,6 @@ async def curate_top5() -> Dict:
     cursor = news_col.find({"scraped_at": {"$gte": from_date}, "processed": True}).limit(50)
     articles = await cursor.to_list(length=50)
 
-    # Fallback to latest articles if today's batch is small
     if len(articles) < 5:
         cursor = news_col.find({"processed": True}).sort("scraped_at", -1).limit(50)
         articles = await cursor.to_list(length=50)
@@ -66,24 +73,21 @@ async def curate_top5() -> Dict:
     if MOCK_MODE:
         return await _mock_curate(articles, today, top5_col)
 
-    article_lines = [
+    article_lines = "\n".join(
         f"{i+1}. [{a.get('source')}] {a.get('ai_title') or a.get('title')} "
         f"(Category: {a.get('category')}) URL: {a.get('url')}"
         for i, a in enumerate(articles[:40])
-    ]
+    )
+    prompt = f"{CURATOR_PROMPT}\n\nToday's articles:\n{article_lines}"
 
     try:
-        response = await _client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": CURATOR_PROMPT},
-                {"role": "user", "content": "Today's articles:\n" + "\n".join(article_lines)},
-            ],
-            temperature=0.2,
-            max_tokens=1500,
-            response_format={"type": "json_object"},
-        )
-        result = json.loads(response.choices[0].message.content)
+        response = await asyncio.to_thread(_model.generate_content, prompt)
+        text = response.text.strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        result = json.loads(text.strip())
         items = result.get("top5", [])
     except Exception as e:
         logger.error(f"Curation error: {e}")

@@ -1,8 +1,9 @@
 """
-AI processing service using OpenAI GPT-4o-mini.
-Falls back gracefully to mock mode if no API key is set.
+AI processing service using Google Gemini Flash.
+Falls back gracefully to mock mode if no API key is configured.
 """
 import json
+import asyncio
 import logging
 from datetime import datetime
 from typing import Dict, Optional
@@ -12,51 +13,59 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 try:
-    from openai import AsyncOpenAI
-    _openai_available = True
+    import google.generativeai as genai
+    _gemini_available = True
 except ImportError:
-    _openai_available = False
-    logger.warning("openai package not installed. Running in mock mode.")
+    _gemini_available = False
+    logger.warning("google-generativeai not installed. Running in mock mode.")
 
-MOCK_MODE = not settings.openai_api_key or not _openai_available
+MOCK_MODE = not settings.gemini_api_key or not _gemini_available
 
 if not MOCK_MODE:
-    _client = AsyncOpenAI(api_key=settings.openai_api_key)
+    genai.configure(api_key=settings.gemini_api_key)
+    _model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        generation_config=genai.types.GenerationConfig(
+            temperature=0.3,
+            max_output_tokens=400,
+        ),
+    )
 
 _STOP_WORDS = {
     "the", "a", "an", "is", "in", "on", "at", "to", "for", "of", "and",
     "or", "but", "with", "has", "have", "been", "were", "was", "will",
 }
 
-SYSTEM_PROMPT = """You are a professional news editor. Process the given news article and return ONLY a JSON object with these fields:
+SYSTEM_PROMPT = """You are a professional news editor. Process the given news article.
+Return ONLY a valid JSON object with these fields:
 - ai_title: Clean, engaging rewritten headline (max 15 words)
-- summary: Clear 3-5 sentence summary
+- summary: Clear 3-5 sentence summary of the article
 - category: One of: general, world, politics, sports, business, technology, science, health, entertainment, india, geopolitics
 - keywords: Array of 3-6 lowercase relevant keywords
-Return ONLY the JSON object."""
+
+Return ONLY the JSON object, no markdown fences, no extra text."""
 
 
-async def _process_with_ai(article: dict) -> Optional[dict]:
-    user_content = (
+async def _process_with_gemini(article: dict) -> Optional[dict]:
+    prompt = (
+        f"{SYSTEM_PROMPT}\n\n"
         f"Title: {article.get('title', '')}\n"
         f"Source: {article.get('source', '')}\n"
         f"Category: {article.get('category', '')}\n"
         f"Snippet: {article.get('summary', '')[:300]}"
     )
     try:
-        response = await _client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ],
-            temperature=0.3,
-            max_tokens=400,
-            response_format={"type": "json_object"},
-        )
-        return json.loads(response.choices[0].message.content)
+        # Run sync Gemini call in a thread to avoid blocking async loop
+        response = await asyncio.to_thread(_model.generate_content, prompt)
+        text = response.text.strip()
+        # Strip markdown fences if present
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        return json.loads(text.strip())
     except Exception as e:
-        logger.error(f"OpenAI error: {e}")
+        logger.error(f"Gemini API error: {e}")
         return None
 
 
@@ -76,7 +85,7 @@ def _mock_process(article: dict) -> dict:
 
 
 async def process_all_unprocessed() -> Dict[str, int]:
-    """Find unprocessed articles and run AI on them."""
+    """Find unprocessed articles and run Gemini AI on them."""
     collection = get_collection("news")
     stats = {"processed": 0, "errors": 0}
 
@@ -86,11 +95,13 @@ async def process_all_unprocessed() -> Dict[str, int]:
 
     for article in articles:
         try:
-            result = (
-                _mock_process(article)
-                if MOCK_MODE
-                else (await _process_with_ai(article) or _mock_process(article))
-            )
+            if MOCK_MODE:
+                result = _mock_process(article)
+            else:
+                result = await _process_with_gemini(article) or _mock_process(article)
+                # Small delay to respect Gemini rate limits (15 RPM on free tier)
+                await asyncio.sleep(1.5)
+
             await collection.update_one(
                 {"_id": article["_id"]},
                 {
