@@ -1,0 +1,20 @@
+# Daily News Intelligence — .gitignore
+
+# Backend
+backend/.env
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/.venv/
+backend/venv/
+*.egg-info/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+# System
+.DS_Store
+Thumbs.db
+*.log
