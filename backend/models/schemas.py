@@ -23,7 +23,7 @@ class ArticleResponse(BaseModel):
         populate_by_name = True
 
 
-class Top5Item(BaseModel):
+class Top10Item(BaseModel):
     rank: int
     title: str
     ai_title: str
@@ -35,9 +35,9 @@ class Top5Item(BaseModel):
     keywords: List[str] = []
 
 
-class Top5Response(BaseModel):
+class Top10Response(BaseModel):
     date: str
-    items: List[Top5Item]
+    items: List[Top10Item]
     generated_at: Optional[str] = None
 
 

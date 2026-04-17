@@ -1,7 +1,7 @@
 """
 Curator — Dainik-Vidya
 Generates:
-  • Top 5  highlights  (premium dashboard section)
+  • Top 10  highlights  (premium dashboard section)
   • Top 10 main feed   (curated_top10 collection)
 Uses Gemini Flash for intelligent selection when available.
 """
@@ -120,24 +120,6 @@ async def _gemini_curate(articles: List[dict], n: int) -> List[dict]:
         logger.debug(f"Gemini curation error: {e}")
         return _mock_items(articles, n)
 
-
-async def curate_top5() -> Dict:
-    """Generate Top-5 highlights for the Dashboard. Stored in top5 collection."""
-    today = date.today().isoformat()
-    top5_col = get_collection("top5")
-    articles = await _load_candidate_articles(60)
-
-    if not articles:
-        logger.warning("Curation: no articles available")
-        return {}
-
-    logger.info(f"Curating Top 5 from {len(articles)} candidates...")
-    items = await _gemini_curate(articles, 5) if not MOCK_MODE else _mock_items(articles, 5)
-
-    doc = {"date": today, "items": items, "generated_at": datetime.now(timezone.utc)}
-    await top5_col.update_one({"date": today}, {"$set": doc}, upsert=True)
-    logger.info(f"  ✅ Top 5 curated for {today}")
-    return doc
 
 
 async def curate_top10() -> Dict:

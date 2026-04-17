@@ -49,14 +49,14 @@ export default function Subscribe() {
           Daily Email Digest
         </h1>
         <p className="text-slate-400 leading-relaxed">
-          Get the Top 5 stories, trending topics, and AI-curated headlines delivered to your inbox every morning at 7:00 AM IST.
+          Get the Top 10 stories, trending topics, and AI-curated headlines delivered to your inbox every morning at 7:00 AM IST.
         </p>
       </div>
 
       {/* Feature pills */}
       <div className="flex flex-wrap justify-center gap-3 mb-10 animate-slide-up">
         {[
-          { icon: Star, label: 'Top 5 AI Stories' },
+          { icon: Star, label: 'Top 10 AI Stories' },
           { icon: Zap, label: 'AI Summaries' },
           { icon: Clock, label: 'Daily at 7 AM IST' },
         ].map(({ icon: Icon, label }) => (
@@ -146,7 +146,7 @@ export default function Subscribe() {
         <h3 className="text-slate-300 font-semibold text-sm mb-4">What's in each digest?</h3>
         <ul className="flex flex-col gap-2.5 text-sm text-slate-400">
           {[
-            '🔥 Top 5 AI-curated stories of the day with importance reasons',
+            '🔥 Top 10 AI-curated stories of the day with importance reasons',
             '📋 5–10 additional headlines from all sources',
             '📊 Trending topics and most-covered category',
             '🔗 Direct links to full articles',

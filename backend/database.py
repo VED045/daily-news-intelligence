@@ -26,7 +26,7 @@ async def connect_db():
         await _db["news"].create_index("url_hash", unique=True)
         await _db["news"].create_index([("published_at", -1)])
         await _db["news"].create_index("category")
-        await _db["top5"].create_index("date", unique=True)
+        await _db["top10"].create_index("date", unique=True)
         await _db["trends"].create_index("date", unique=True)
         await _db["users"].create_index("email", unique=True)
         logger.info("✅ Indexes created")

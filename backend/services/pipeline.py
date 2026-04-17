@@ -7,7 +7,7 @@ Full hybrid pipeline:
   3. Title deduplication → remove near-duplicate articles
   4. Category ranking    → priority sort + sports cap
   5. AI processing       → only top MAX_AI_ARTICLES sent to Gemini
-  6. Curation            → Top 5 highlights
+  6. Curation            → Top 10 highlights
   7. Trends              → daily analytics
   8. Meta update         → record lastFetchedAt timestamp
   9. Email digest        → send to subscribers

@@ -13,17 +13,17 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 
-def _build_html(top5: List[Dict], headlines: List[Dict], trends: Dict, date_str: str, email: str) -> str:
+def _build_html(top10: List[Dict], headlines: List[Dict], trends: Dict, date_str: str, email: str) -> str:
     unsub_url = f"{settings.frontend_url}/subscribe?unsubscribe={email}"
 
-    top5_html = "".join(
+    top10_html = "".join(
         f"""<div style="background:#1e293b;border-left:4px solid #6366f1;padding:16px;margin-bottom:12px;border-radius:6px;">
         <span style="color:#818cf8;font-size:11px;font-weight:700;">#{item.get('rank')} — {item.get('category','').upper()}</span>
         <h3 style="color:#f1f5f9;margin:8px 0 6px;font-size:16px;">{item.get('ai_title') or item.get('title','')}</h3>
         <p style="color:#94a3b8;font-size:13px;line-height:1.7;margin:0 0 8px;">{item.get('summary','')}</p>
         <p style="color:#64748b;font-size:12px;font-style:italic;margin:0 0 8px;">💡 {item.get('importance_reason','')}</p>
         <a href="{item.get('url','#')}" style="color:#818cf8;font-size:13px;text-decoration:none;">Read full story →</a></div>"""
-        for item in top5[:5]
+        for item in top10[:10]
     )
 
     headlines_html = "".join(
@@ -49,8 +49,8 @@ def _build_html(top5: List[Dict], headlines: List[Dict], trends: Dict, date_str:
     <p style="color:#475569;font-size:14px;margin:0;">{date_str}</p>
   </div>
   <div style="background:#1a2540;border-radius:12px;padding:24px;margin-bottom:20px;">
-    <h2 style="color:#f1f5f9;font-size:18px;border-bottom:1px solid #334155;padding-bottom:12px;margin-top:0;">🔥 Top 5 Today</h2>
-    {top5_html if top5_html else '<p style="color:#64748b;">Top 5 not yet generated today.</p>'}
+    <h2 style="color:#f1f5f9;font-size:18px;border-bottom:1px solid #334155;padding-bottom:12px;margin-top:0;">🔥 Top 10 Today</h2>
+    {top10_html if top10_html else '<p style="color:#64748b;">Top 10 not yet generated today.</p>'}
   </div>
   <div style="background:#1a2540;border-radius:12px;padding:24px;margin-bottom:20px;">
     <h2 style="color:#f1f5f9;font-size:18px;border-bottom:1px solid #334155;padding-bottom:12px;margin-top:0;">📋 More Headlines</h2>
@@ -75,11 +75,11 @@ async def send_daily_digest() -> Dict:
 
     users_col = get_collection("users")
     news_col = get_collection("news")
-    top5_col = get_collection("top5")
+    top10_col = get_collection("top10")
     trends_col = get_collection("trends")
 
     today = date.today().isoformat()
-    top5_doc = await top5_col.find_one({"date": today}) or {}
+    top10_doc = await top10_col.find_one({"date": today}) or {}
     trends_doc = await trends_col.find_one({"date": today}) or {}
 
     cursor = news_col.find({"processed": True}).sort("published_at", -1).limit(15)
@@ -106,7 +106,7 @@ async def send_daily_digest() -> Dict:
                 msg["Subject"] = f"📰 Daily News Intelligence — {date_str}"
                 msg["From"] = settings.from_email
                 msg["To"] = user["email"]
-                html = _build_html(top5_doc.get("items", []), headlines, trends_doc, date_str, user["email"])
+                html = _build_html(top10_doc.get("items", []), headlines, trends_doc, date_str, user["email"])
                 msg.attach(MIMEText(html, "html"))
                 server.sendmail(settings.smtp_user, user["email"], msg.as_string())
                 sent += 1
