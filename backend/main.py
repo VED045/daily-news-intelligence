@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import connect_db, close_db
-from routes import news, top5, trends, subscription, search, bookmarks, meta
+from routes import news, top10, trends, subscription, search, bookmarks, meta, auth
 from scheduler.jobs import start_scheduler, stop_scheduler
 
 logging.basicConfig(
@@ -49,8 +49,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router,         prefix="/auth",       tags=["Auth"])
 app.include_router(news.router,         prefix="/news",       tags=["News"])
-app.include_router(top5.router,         prefix="/top5",       tags=["Top 5"])
+app.include_router(top10.router,        prefix="/top10",      tags=["Top 10"])
 app.include_router(trends.router,       prefix="/trends",     tags=["Trends"])
 app.include_router(subscription.router,                       tags=["Subscription"])
 app.include_router(search.router,       prefix="/search",     tags=["Search"])

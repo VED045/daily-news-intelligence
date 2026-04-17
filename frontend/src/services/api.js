@@ -4,6 +4,22 @@ const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const api = axios.create({ baseURL: BASE, timeout: 15000 })
 
+// Intercept requests to add token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// ─── Auth ─────────────────────────────────────────────────────
+export const login = (email, password) =>
+  api.post('/auth/login', { email, password }).then(r => r.data)
+
+export const signup = (email, password, name) =>
+  api.post('/auth/signup', { email, password, name }).then(r => r.data)
+
 // ─── News ─────────────────────────────────────────────────────
 export const getNews = (category = '', page = 1, limit = 10, topic = '') =>
   api.get('/news', { params: {
@@ -16,8 +32,8 @@ export const getNews = (category = '', page = 1, limit = 10, topic = '') =>
 export const searchNews = (q, page = 1) =>
   api.get('/search', { params: { q, page } }).then(r => r.data)
 
-// ─── Top 5 ────────────────────────────────────────────────────
-export const getTop5 = () => api.get('/top5').then(r => r.data)
+// ─── Top 10 ───────────────────────────────────────────────────
+export const getTop10 = () => api.get('/top10').then(r => r.data)
 
 // ─── Trends ──────────────────────────────────────────────────
 export const getTrends = () => api.get('/trends').then(r => r.data)

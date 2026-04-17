@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useTheme, APP_NAME } from '../App'
 import {
   Newspaper, BarChart3, Star, Mail, Bookmark,
-  Sun, Moon, Menu, X, Zap, RefreshCw
+  Sun, Moon, Menu, X, Zap, RefreshCw, LogOut, LogIn
 } from 'lucide-react'
 import { fetchLatestNews } from '../services/api'
 import toast from 'react-hot-toast'
@@ -16,7 +16,7 @@ const NAV_LINKS = [
   { to: '/subscribe',  label: 'Subscribe',  icon: Mail },
 ]
 
-export default function Navbar() {
+export default function Navbar({ auth, setAuth }) {
   const { dark, toggle } = useTheme()
   const { pathname } = useLocation()
   const [open, setOpen] = useState(false)
@@ -39,6 +39,13 @@ export default function Navbar() {
     } finally {
       setTimeout(() => setRunning(false), 3500)
     }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    setAuth(null)
+    toast.success('Logged out successfully')
   }
 
   return (
@@ -89,6 +96,28 @@ export default function Navbar() {
             {running ? 'Fetching…' : 'Fetch Latest News'}
           </button>
 
+          {auth ? (
+            <button
+              onClick={handleLogout}
+              title="Logout"
+              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                dark ? 'border-red-900/50 text-red-400 hover:bg-red-900/20' : 'border-red-200 text-red-500 hover:bg-red-50'
+              }`}
+            >
+              <LogOut size={14} /> Logout
+            </button>
+          ) : (
+            <Link
+              to="/login"
+              title="Login"
+              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                dark ? 'border-primary-900/50 text-primary-400 hover:bg-primary-900/20' : 'border-primary-200 text-primary-600 hover:bg-primary-50'
+              }`}
+            >
+              <LogIn size={14} /> Login
+            </Link>
+          )}
+
           <button
             onClick={toggle}
             className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all
@@ -125,6 +154,15 @@ export default function Navbar() {
           <button onClick={handleTrigger} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium ${linkInactive}`}>
             <RefreshCw size={16} />Fetch Latest News
           </button>
+          {auth ? (
+            <button onClick={() => { handleLogout(); setOpen(false) }} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10`}>
+              <LogOut size={16} /> Logout
+            </button>
+          ) : (
+            <Link to="/login" onClick={() => setOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/10`}>
+              <LogIn size={16} /> Login
+            </Link>
+          )}
         </div>
       )}
     </nav>

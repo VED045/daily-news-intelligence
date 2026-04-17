@@ -7,6 +7,8 @@ import NewsFeed from './pages/NewsFeed'
 import Trends from './pages/Trends'
 import Subscribe from './pages/Subscribe'
 import Bookmarks from './pages/Bookmarks'
+import Login from './pages/Login'
+import Signup from './pages/Signup'
 
 export const ThemeContext = createContext({ dark: true, toggle: () => {} })
 export const useTheme = () => useContext(ThemeContext)
@@ -16,6 +18,14 @@ export const APP_TAGLINE = 'AI-Powered News Intelligence'
 
 export default function App() {
   const [dark, setDark] = useState(() => localStorage.getItem('dv-theme') !== 'light')
+  const [auth, setAuth] = useState(() => {
+    try {
+      const saved = localStorage.getItem('user')
+      return saved ? JSON.parse(saved) : null
+    } catch {
+      return null
+    }
+  })
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -29,7 +39,7 @@ export default function App() {
         dark ? 'bg-slate-950 text-slate-100' : 'bg-[#F8FAFC] text-[#1F2937]'
       }`}>
         <Router>
-          <Navbar />
+          <Navbar auth={auth} setAuth={setAuth} />
           <main className="pt-16 min-h-screen">
             <Routes>
               <Route path="/" element={<Dashboard />} />
@@ -37,6 +47,8 @@ export default function App() {
               <Route path="/bookmarks" element={<Bookmarks />} />
               <Route path="/trends" element={<Trends />} />
               <Route path="/subscribe" element={<Subscribe />} />
+              <Route path="/login" element={<Login setAuth={setAuth} />} />
+              <Route path="/signup" element={<Signup setAuth={setAuth} />} />
             </Routes>
           </main>
           <Footer />

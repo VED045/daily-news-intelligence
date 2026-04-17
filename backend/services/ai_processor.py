@@ -60,6 +60,8 @@ def _init_gemini():
         # ── Model preference list ─────────────────────────────────
         candidates = [
             settings.gemini_model,       # env default: "gemini-1.5-flash"
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
             "gemini-1.5-flash",
             "gemini-1.5-flash-latest",
             "gemini-1.5-pro",

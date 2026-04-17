@@ -22,8 +22,8 @@ export function CardSkeleton() {
   )
 }
 
-// ─── Top5 Skeleton ───────────────────────────────────────────
-export function Top5Skeleton() {
+// ─── Top 10 Skeleton ───────────────────────────────────────────
+export function Top10Skeleton() {
   return (
     <div className="glass rounded-2xl p-6 flex flex-col gap-4 animate-pulse">
       <div className="flex items-center gap-3">

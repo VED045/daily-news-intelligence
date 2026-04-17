@@ -216,9 +216,9 @@ async def run_full_pipeline() -> Dict:
 
     # ── Step 6: Curate ────────────────────────────────────────────
     try:
-        logger.info("⭐ [5/6] Curating Top 5 highlights...")
-        from services.curator import curate_top5
-        await curate_top5()
+        logger.info("⭐ [5/6] Curating Top 10 highlights...")
+        from services.curator import curate_top10
+        await curate_top10()
     except Exception as e:
         logger.error(f"     Curation failed: {e}")
         summary["errors"].append(f"curator: {e}")

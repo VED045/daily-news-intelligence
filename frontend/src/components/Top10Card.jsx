@@ -9,7 +9,7 @@ const RANK_STYLES = [
   'from-primary-500 to-primary-600 shadow-primary-500/20', // #5
 ]
 
-export default function Top5Card({ item }) {
+export default function Top10Card({ item }) {
   const rankStyle = RANK_STYLES[(item.rank || 1) - 1] || RANK_STYLES[4]
 
   return (

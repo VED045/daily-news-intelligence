@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Star, TrendingUp, BarChart3, Newspaper, ArrowRight, RefreshCw, AlertTriangle, Clock } from 'lucide-react'
-import { getTop5, getTrends, getMeta } from '../services/api'
-import Top5Card from '../components/Top5Card'
-import { Top5Skeleton, TrendSkeleton } from '../components/Skeleton'
+import { getTop10, getTrends, getMeta } from '../services/api'
+import Top10Card from '../components/Top10Card'
+import { Top10Skeleton, TrendSkeleton } from '../components/Skeleton'
 import { StatBar } from '../components/TrendChart'
 import { useTheme } from '../App'
 
@@ -28,7 +28,7 @@ function timeAgo(isoString) {
 export default function Dashboard() {
   const { dark } = useTheme()
   const navigate = useNavigate()
-  const [top5, setTop5] = useState(null)
+  const [top10, setTop10] = useState(null)
   const [trends, setTrends] = useState(null)
   const [meta, setMeta] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -37,8 +37,8 @@ export default function Dashboard() {
   const load = async () => {
     setLoading(true); setError(null)
     try {
-      const [t5, tr, mt] = await Promise.all([getTop5(), getTrends(), getMeta()])
-      setTop5(t5); setTrends(tr); setMeta(mt)
+      const [t10, tr, mt] = await Promise.all([getTop10(), getTrends(), getMeta()])
+      setTop10(t10); setTrends(tr); setMeta(mt)
     } catch {
       setError('Cannot connect to backend. Start the FastAPI server first.')
     } finally {
@@ -125,25 +125,25 @@ export default function Dashboard() {
 
       <div className="grid xl:grid-cols-3 gap-8">
 
-        {/* Top 5 — 2/3 width */}
+        {/* Top 10 — 2/3 width */}
         <div className="xl:col-span-2">
           <div className="flex items-center justify-between mb-5">
             <h2 className={`font-bold text-xl flex items-center gap-2 ${dark ? 'text-slate-100' : 'text-slate-800'}`}>
-              🔥 <span>Top 5 Today</span>
+              🔥 <span>Top 10 Today</span>
             </h2>
             <Link to="/news" className="btn-ghost text-xs">All News <ArrowRight size={14} /></Link>
           </div>
 
           {loading ? (
-            <div className="grid gap-4">{[...Array(3)].map((_, i) => <Top5Skeleton key={i} />)}</div>
-          ) : top5?.items?.length > 0 ? (
+            <div className="grid gap-4">{[...Array(10)].map((_, i) => <Top10Skeleton key={i} />)}</div>
+          ) : top10?.items?.length > 0 ? (
             <div className="grid gap-4">
-              {top5.items.map(item => <Top5Card key={item.rank} item={item} />)}
+              {top10.items.map(item => <Top10Card key={item.rank} item={item} />)}
             </div>
           ) : (
             <div className={`rounded-2xl p-10 text-center ${dark ? 'glass text-slate-500' : 'bg-white border border-slate-200 text-slate-400 shadow-sm'}`}>
               <Star size={36} className="mx-auto mb-3 opacity-30" />
-              <p className="font-medium mb-1">No Top 5 yet</p>
+              <p className="font-medium mb-1">No Top 10 yet</p>
               <p className="text-sm">Click <strong className="text-primary-500">Fetch Latest News</strong> in the navbar to get today's headlines.</p>
             </div>
           )}

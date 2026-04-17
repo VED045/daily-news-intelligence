@@ -6,6 +6,7 @@ Uses newsapi.org top-headlines + everything endpoints.
 import requests
 import hashlib
 import logging
+import asyncio
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from database import get_collection
@@ -70,7 +71,8 @@ async def fetch_news_api() -> Dict[str, int]:
 
         try:
             if cfg["type"] == "top-headlines":
-                resp = requests.get(
+                resp = await asyncio.to_thread(
+                    requests.get,
                     f"{NEWSAPI_BASE}/top-headlines",
                     params={
                         "apiKey": settings.news_api_key,
@@ -81,7 +83,8 @@ async def fetch_news_api() -> Dict[str, int]:
                     timeout=15,
                 )
             else:
-                resp = requests.get(
+                resp = await asyncio.to_thread(
+                    requests.get,
                     f"{NEWSAPI_BASE}/everything",
                     params={
                         "apiKey": settings.news_api_key,
@@ -154,7 +157,13 @@ async def fetch_news_api() -> Dict[str, int]:
                 logger.info(f"  ✅ NewsAPI [{cfg['our_cat']}]: +{inserted} articles")
 
         except requests.RequestException as e:
-            logger.warning(f"  ⚠️ NewsAPI [{cfg.get('category', cfg.get('q', '?'))}]: {e}")
+            err_text = ""
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    err_text = f" | Response: {e.response.text}"
+                except Exception:
+                    pass
+            logger.warning(f"  ⚠️ NewsAPI [{cfg.get('category', cfg.get('q', '?'))}]: {e}{err_text}")
             stats["errors"] += 1
         except Exception as e:
             logger.error(f"  ❌ NewsAPI unexpected error: {e}")

@@ -1,5 +1,5 @@
 """
-Top 5 AI-curated articles route.
+Top 10 AI-curated articles route.
 """
 from fastapi import APIRouter, HTTPException
 from datetime import date
@@ -11,10 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("")
-async def get_top5():
-    """Get today's top 5 AI-curated news stories."""
+async def get_top10():
+    """Get today's top 10 AI-curated news stories."""
     try:
-        collection = get_collection("top5")
+        collection = get_collection("top10")
         today = date.today().isoformat()
 
         doc = await collection.find_one({"date": today})
@@ -25,7 +25,7 @@ async def get_top5():
             return {
                 "date": today,
                 "items": [],
-                "message": "Top 5 not yet generated. Trigger the pipeline or wait for the scheduler.",
+                "message": "Top 10 not yet generated. Trigger the pipeline or wait for the scheduler.",
             }
 
         doc["_id"] = str(doc["_id"])
@@ -33,5 +33,6 @@ async def get_top5():
             doc["generated_at"] = doc["generated_at"].isoformat()
         return doc
     except Exception as e:
-        logger.error(f"Error fetching top5: {e}")
+        logger.error(f"Error fetching top10: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
