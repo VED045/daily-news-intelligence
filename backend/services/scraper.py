@@ -30,7 +30,8 @@ HEADERS = {
 }
 
 # Max articles to add per pipeline run (keeps us well under any API/server limits)
-MAX_TOTAL_NEW = 250
+MAX_PER_LANG = 100
+MAX_TOTAL_NEW = 300
 
 # How many entries to pull per feed (non-sports)
 DEFAULT_FEED_LIMIT = 8
@@ -50,9 +51,13 @@ RSS_FEEDS = [
     {"url": "https://feeds.reuters.com/reuters/topNews",     "source": "Reuters",          "category": "general",  "language": "en"},
     {"url": "https://feeds.reuters.com/reuters/worldNews",   "source": "Reuters World",    "category": "world",    "language": "en"},
     {"url": "https://feeds.reuters.com/reuters/businessNews","source": "Reuters Business", "category": "business", "language": "en"},
-    # Firstpost
+    # Indian / More English
     {"url": "https://www.firstpost.com/rss/world.xml",      "source": "Firstpost World",  "category": "world",    "language": "en"},
     {"url": "https://www.firstpost.com/rss/india.xml",      "source": "Firstpost India",  "category": "india",    "language": "en"},
+    {"url": "https://www.hindustantimes.com/rss/world/rssfeed.xml", "source": "Hindustan Times", "category": "world", "language": "en"},
+    {"url": "https://indianexpress.com/feed/",              "source": "Indian Express",   "category": "general",   "language": "en"},
+    {"url": "https://scroll.in/feed/",                      "source": "Scroll",           "category": "general",  "language": "en"},
+    {"url": "https://theprint.in/feed/",                    "source": "The Print",        "category": "politics", "language": "en"},
     # Others
     {"url": "https://www.thehindu.com/feeder/default.rss",  "source": "The Hindu",        "category": "india",    "language": "en"},
     {"url": "https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "source": "Times of India", "category": "india", "language": "en"},
@@ -63,14 +68,19 @@ RSS_FEEDS = [
     {"url": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml", "source": "NYT Business","category": "finance", "language": "en"},
 
     # ── HINDI ─────────────────────────────────────────────────────────────────
-    {"url": "https://feeds.feedburner.com/ndtvkhabar",      "source": "NDTV Hindi",       "category": "india",    "language": "hi"},
     {"url": "https://www.aajtak.in/rssfeeds/?id=home",      "source": "Aaj Tak",          "category": "india",    "language": "hi"},
+    {"url": "https://feeds.feedburner.com/ndtvkhabar",      "source": "NDTV Hindi",       "category": "india",    "language": "hi"},
+    {"url": "https://www.bhaskar.com/rss-feed/1061/",       "source": "Dainik Bhaskar",   "category": "india",    "language": "hi"},
+    {"url": "https://www.amarujala.com/rss/breaking-news.xml","source": "Amar Ujala",     "category": "india",    "language": "hi"},
+    {"url": "https://english.jagran.com/rss/news",          "source": "Jagran",           "category": "india",    "language": "hi"},
     {"url": "https://hindi.firstpost.com/rss/news.xml",     "source": "Firstpost Hindi",  "category": "india",    "language": "hi"},
 
     # ── MARATHI ───────────────────────────────────────────────────────────────
     {"url": "https://www.lokmat.com/rss/latest-news.xml",   "source": "Lokmat",           "category": "india",    "language": "mr"},
-    {"url": "https://www.esakal.com/feed",                  "source": "Sakal",            "category": "india",    "language": "mr"},
     {"url": "https://www.loksatta.com/feed/",               "source": "Loksatta",         "category": "india",    "language": "mr"},
+    {"url": "https://www.esakal.com/feed",                  "source": "Sakal",            "category": "india",    "language": "mr"},
+    {"url": "https://maharashtratimes.com/rssfeedstopstories.cms", "source": "Maharashtra Times", "category": "india", "language": "mr"},
+    {"url": "https://pudhari.news/feed/",                   "source": "Pudhari",          "category": "india",    "language": "mr"},
 
     # ── TELUGU ────────────────────────────────────────────────────────────────
     {"url": "https://www.sakshi.com/rss/home",              "source": "Sakshi",           "category": "india",    "language": "te"},
@@ -205,10 +215,18 @@ async def scrape_all_feeds() -> Dict[str, int]:
     stats = {"total_fetched": 0, "new_articles": 0, "duplicates": 0, "errors": 0}
     global_new = 0  # running count of newly inserted articles
 
+    from collections import defaultdict
+    lang_counts = defaultdict(int)
+
     for feed_cfg in RSS_FEEDS:
+        language = feed_cfg.get("language", "en")
+        
         if global_new >= MAX_TOTAL_NEW:
-            logger.info("Reached 100-article cap — stopping scrape.")
+            logger.info("Reached global cap — stopping scrape.")
             break
+            
+        if lang_counts[language] >= MAX_PER_LANG:
+            continue
 
         url = feed_cfg["url"]
         source = feed_cfg["source"]
@@ -225,7 +243,7 @@ async def scrape_all_feeds() -> Dict[str, int]:
 
             batch = []
             for entry in feed.entries[:per_feed_limit]:
-                if global_new + len(batch) >= MAX_TOTAL_NEW:
+                if lang_counts[language] >= MAX_PER_LANG or global_new >= MAX_TOTAL_NEW:
                     break
 
                 article_url = entry.get("link", "")
@@ -277,7 +295,8 @@ async def scrape_all_feeds() -> Dict[str, int]:
                 inserted = len(result.inserted_ids)
                 stats["new_articles"] += inserted
                 global_new += inserted
-                logger.info(f"  ✅ {source}: +{inserted} articles (running total: {global_new})")
+                lang_counts[language] += inserted
+                logger.info(f"  ✅ {source}: +{inserted} articles ({language}={lang_counts[language]}, total={global_new})")
 
         except requests.RequestException as e:
             logger.warning(f"Scrape fetch failed | source={source} details={e}")

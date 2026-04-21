@@ -17,9 +17,11 @@ async def get_top10(language: str = "en"):
         collection = get_collection("top10")
         today = date.today().isoformat()
 
-        doc = await collection.find_one({"date": today, "language": language})
+        fallback_query = {"$or": [{"language": language}, {"language": {"$exists": False}}]}
+        
+        doc = await collection.find_one({"date": today, **fallback_query})
         if not doc:
-            doc = await collection.find_one({"language": language}, sort=[("date", -1)])
+            doc = await collection.find_one(fallback_query, sort=[("date", -1)])
 
         if not doc:
             return {

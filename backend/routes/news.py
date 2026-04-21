@@ -119,11 +119,17 @@ async def get_sources():
 async def get_category_counts(
     date_from: Optional[str] = Query(None, description="ISO date e.g. 2026-04-21"),
     date_to: Optional[str] = Query(None),
+    language: str = Query("en", description="Filter by language"),
 ):
     """Return {category: count} only for categories with count > 0."""
     try:
         collection = get_collection("news")
-        query: dict = {}
+        query: dict = {
+            "$or": [
+                {"language": language},
+                {"language": {"$exists": False}}
+            ]
+        }
 
         start, end = _parse_date_range(date_from, date_to)
         if start and end:
@@ -162,12 +168,18 @@ async def get_news(
     """
     try:
         collection = get_collection("news")
-        query: dict = {"language": language}
+        query: dict = {
+            "$or": [
+                {"language": language},
+                {"language": {"$exists": False}}
+            ]
+        }
 
         # Date range filter
         start, end = _parse_date_range(date_from, date_to)
         if start and end:
             query["scraped_at"] = {"$gte": start, "$lt": end}
+            logger.info(f"Date range: {start} → {end}")
 
         # Source filter
         if source:
@@ -185,6 +197,8 @@ async def get_news(
 
         cat_filter_active = bool(category and category.lower() not in ("all", ""))
 
+        logger.info(f"Query: {query}")
+
         if cat_filter_active:
             skip = (page - 1) * limit
             cursor = (
@@ -194,6 +208,7 @@ async def get_news(
             )
             articles = [_serialize(doc) async for doc in cursor]
             total = await collection.count_documents(query)
+            logger.info(f"Results count: {len(articles)}")
             return {"articles": articles, "total": total, "page": page,
                     "has_more": (skip + limit) < total}
 
@@ -209,6 +224,8 @@ async def get_news(
         capped       = _apply_sports_cap(sorted_pool, MAX_SPORTS_IN_FEED)
         skip         = (page - 1) * limit
         page_items   = capped[skip: skip + limit]
+
+        logger.info(f"Results count: {len(page_items)}")
 
         return {
             "articles": page_items,

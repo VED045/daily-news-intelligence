@@ -31,7 +31,7 @@ async def connect_db():
         await _db["bookmarks"].create_index(
             [("user_id", 1), ("articleId", 1)], unique=True
         )
-        await _db["news"].create_index("scraped_at")
+        await _db["news"].create_index("scraped_at", expireAfterSeconds=604800)
         await _db["news"].create_index("source")
         logger.info("✅ Indexes created")
     except Exception as e:

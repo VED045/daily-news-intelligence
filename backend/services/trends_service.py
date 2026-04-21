@@ -90,9 +90,9 @@ async def _generate_ai_trends(articles: List[dict], language: str) -> dict:
             "category_insights": data.get("category_insights", {})
         }
     except Exception as e:
-        logger.error(f"Gemini trends generation error dict: {e}")
+        logger.error("Gemini failed — using fallback")
         return {
-            "overview": "Failed to generate AI trends overview.",
+            "overview": "Trend generating... using basic summarization. Events are populated into categories.",
             "top_themes": [],
             "category_insights": {}
         }

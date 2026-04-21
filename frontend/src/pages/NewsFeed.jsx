@@ -6,7 +6,7 @@ import NewsCard from '../components/NewsCard'
 import CategoryFilter from '../components/CategoryFilter'
 import SearchBar from '../components/SearchBar'
 import { CardSkeleton } from '../components/Skeleton'
-import { useTheme, useAuth, useLanguage } from '../App'
+import { useTheme, useAuth, useLanguage, useFilters } from '../App'
 
 const PAGE_SIZE = 10
 
@@ -18,13 +18,13 @@ const DATE_OPTIONS = [
 
 function getDateRange(option, specificDay = '') {
   const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
 
   if (specificDay !== '') {
     const dStart = new Date(today)
-    dStart.setDate(dStart.getDate() - parseInt(specificDay))
+    dStart.setUTCDate(dStart.getUTCDate() - parseInt(specificDay))
     const dEnd = new Date(dStart)
-    dEnd.setDate(dEnd.getDate() + 1)
+    dEnd.setUTCDate(dEnd.getUTCDate() + 1)
     return { 
       date_from: dStart.toISOString().split('T')[0],
       date_to: dEnd.toISOString().split('T')[0]
@@ -32,27 +32,38 @@ function getDateRange(option, specificDay = '') {
   }
 
   if (option === '3days') {
-    const d = new Date(today)
-    d.setDate(d.getDate() - 3)
-    return { date_from: d.toISOString().split('T')[0] }
+    const dStart = new Date(today)
+    dStart.setUTCDate(dStart.getUTCDate() - 2)
+    const dEnd = new Date(today)
+    dEnd.setUTCDate(dEnd.getUTCDate() + 1)
+    return { date_from: dStart.toISOString().split('T')[0], date_to: dEnd.toISOString().split('T')[0] }
   }
   if (option === '7days') {
-    const d = new Date(today)
-    d.setDate(d.getDate() - 7)
-    return { date_from: d.toISOString().split('T')[0] }
+    const dStart = new Date(today)
+    dStart.setUTCDate(dStart.getUTCDate() - 6)
+    const dEnd = new Date(today)
+    dEnd.setUTCDate(dEnd.getUTCDate() + 1)
+    return { date_from: dStart.toISOString().split('T')[0], date_to: dEnd.toISOString().split('T')[0] }
   }
-  return {} // today — let backend use default
+  
+  // today
+  const dEnd = new Date(today)
+  dEnd.setUTCDate(dEnd.getUTCDate() + 1)
+  return { 
+    date_from: today.toISOString().split('T')[0],
+    date_to: dEnd.toISOString().split('T')[0]
+  }
 }
 
 export default function NewsFeed() {
   const { dark } = useTheme()
   const { auth } = useAuth()
   const { language } = useLanguage()
+  const { dateFilter, setDateFilter, specificDay, setSpecificDay, sourceFilter, setSourceFilter, category, setCategory } = useFilters()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const urlQuery = searchParams.get('q') || ''
 
-  const [category, setCategory] = useState('all')
   const [searchQuery, setSearchQuery] = useState(urlQuery)
   const [articles, setArticles] = useState([])
   const [page, setPage] = useState(1)
@@ -62,9 +73,6 @@ export default function NewsFeed() {
   const [activeTopic, setActiveTopic] = useState(urlQuery)
 
   // Filters
-  const [dateFilter, setDateFilter] = useState('today')
-  const [specificDay, setSpecificDay] = useState('')
-  const [sourceFilter, setSourceFilter] = useState('')
   const [sources, setSources] = useState([])
   const [categoryCounts, setCategoryCounts] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
@@ -77,8 +85,8 @@ export default function NewsFeed() {
 
   useEffect(() => {
     const range = getDateRange(dateFilter, specificDay)
-    getCategoryCounts(range).then(d => setCategoryCounts(d.category_counts || {})).catch(() => {})
-  }, [dateFilter, specificDay])
+    getCategoryCounts({ ...range, language }).then(d => setCategoryCounts(d.category_counts || {})).catch(() => {})
+  }, [dateFilter, specificDay, language])
 
   // Sync personalized toggle with auth
   useEffect(() => {
@@ -224,7 +232,7 @@ export default function NewsFeed() {
         </div>
       </div>
 
-      {/* Filter panel */}
+      {/* Filter panel handled by Navbar on Desktop, but kept for non-navbar overrides or mobile */}
       {showFilters && !isSearchMode && (
         <div className={`mb-6 rounded-2xl p-5 animate-fade-in ${dark ? 'glass' : 'bg-white border border-slate-200 shadow-sm'}`}>
           <div className="flex flex-wrap items-end gap-4">

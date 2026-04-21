@@ -186,7 +186,7 @@ async def run_full_pipeline() -> Dict:
         summary["news_api"] = api.get("new", 0)
         logger.info(f"     NewsAPI: +{summary['news_api']} new articles")
     except Exception as e:
-        logger.exception("NewsAPI fetch failed")
+        logger.error("NewsAPI failed — using RSS only")
         summary["errors"].append(f"newsapi: {e}")
 
     summary["merged_total"] = summary["scraped"] + summary["news_api"]

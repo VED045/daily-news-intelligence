@@ -153,7 +153,13 @@ async def get_personalized_feed(
     preferred = user_doc.get("preferred_topics", []) if user_doc else []
     preferred_lang = user_doc.get("preferred_language", "en") if user_doc else "en"
 
-    query: dict = {"language": preferred_lang}
+    query: dict = {}
+
+    if preferred:
+        query["$or"] = [
+            {"language": preferred_lang},
+            {"language": {"$exists": False}}
+        ]
 
     # Date filter
     if date_from:

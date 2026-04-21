@@ -20,6 +20,14 @@ export const useAuth = () => useContext(AuthContext)
 export const LanguageContext = createContext({ language: 'en', setLanguage: () => {} })
 export const useLanguage = () => useContext(LanguageContext)
 
+export const FilterContext = createContext({
+  dateFilter: 'today', setDateFilter: () => {},
+  specificDay: '', setSpecificDay: () => {},
+  sourceFilter: '', setSourceFilter: () => {},
+  category: 'all', setCategory: () => {}
+})
+export const useFilters = () => useContext(FilterContext)
+
 export const APP_NAME = 'Dainik-Vidya'
 export const APP_TAGLINE = 'AI-Powered News Intelligence'
 
@@ -35,6 +43,11 @@ export default function App() {
   })
   
   const [language, setLanguage] = useState(() => localStorage.getItem('dv-lang') || 'en')
+  
+  const [dateFilter, setDateFilter] = useState('today')
+  const [specificDay, setSpecificDay] = useState('')
+  const [sourceFilter, setSourceFilter] = useState('')
+  const [category, setCategory] = useState('all')
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -57,6 +70,10 @@ export default function App() {
     <ThemeContext.Provider value={{ dark, toggle: () => setDark(d => !d) }}>
       <AuthContext.Provider value={{ auth, setAuth }}>
         <LanguageContext.Provider value={{ language, setLanguage }}>
+          <FilterContext.Provider value={{
+            dateFilter, setDateFilter, specificDay, setSpecificDay,
+            sourceFilter, setSourceFilter, category, setCategory
+          }}>
           <div className={`min-h-screen transition-colors duration-300 ${
           dark ? 'bg-slate-950 text-slate-100' : 'bg-[#F8FAFC] text-[#1F2937]'
         }`}>
@@ -89,6 +106,7 @@ export default function App() {
             }}
           />
         </div>
+          </FilterContext.Provider>
         </LanguageContext.Provider>
       </AuthContext.Provider>
     </ThemeContext.Provider>

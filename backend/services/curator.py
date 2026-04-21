@@ -202,7 +202,7 @@ async def _gemini_curate(articles: List[dict], n: int, language: str = "en", pre
         logger.warning(f"Gemini returned invalid JSON: {e}")
         return _mock_items(articles, n)
     except Exception as e:
-        logger.debug(f"Gemini curation error: {e}")
+        logger.error("Gemini failed — using fallback")
         return _mock_items(articles, n)
 
 
