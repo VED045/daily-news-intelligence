@@ -160,10 +160,11 @@ async def get_personalized_feed(
 
     query: dict = {}
 
-    if preferred:
+    # Language filter: include articles that match OR have no language field stored
+    if preferred_lang:
         query["$or"] = [
             {"language": preferred_lang},
-            {"language": {"$exists": False}}
+            {"language": {"$exists": False}},
         ]
 
     # Date filter
@@ -189,8 +190,21 @@ async def get_personalized_feed(
 
     pool_size = max(limit * 10, 100)
     cursor = news_col.find(query).sort("scraped_at", -1).limit(pool_size)
-
     pool = [_serialize(doc) async for doc in cursor]
+
+    # ── Fallback: if personalized query returned nothing, widen to all articles ──
+    if not pool and preferred:
+        logger.warning(
+            f"Personalized feed empty → fallback used | "
+            f"user={user['email']} lang={preferred_lang} topics={preferred}"
+        )
+        fallback_query: dict = {"scraped_at": {"$gte": start, "$lt": end}}
+        if source:
+            fallback_query["source"] = {"$regex": source, "$options": "i"}
+        if category and category.lower() not in ("all", ""):
+            fallback_query["category"] = {"$regex": category, "$options": "i"}
+        cursor = news_col.find(fallback_query).sort("scraped_at", -1).limit(pool_size)
+        pool = [_serialize(doc) async for doc in cursor]
 
     # Sorting
     if preferred:

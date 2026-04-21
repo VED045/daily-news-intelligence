@@ -212,7 +212,13 @@ def _extract_content_preview(entry) -> str:
 async def scrape_all_feeds() -> Dict[str, int]:
     """Scrape all RSS feeds. Caps: 100 new total, ≤2 per sports feed."""
     collection = get_collection("news")
-    stats = {"total_fetched": 0, "new_articles": 0, "duplicates": 0, "errors": 0}
+    stats = {
+        "total_fetched": 0,
+        "new_articles": 0,
+        "duplicates": 0,
+        "errors": 0,
+        "failed_sources": [],
+    }
     global_new = 0  # running count of newly inserted articles
 
     from collections import defaultdict
@@ -301,11 +307,16 @@ async def scrape_all_feeds() -> Dict[str, int]:
                 logger.info(f"  ✅ {source}: +{inserted} articles ({language}={lang_counts[language]}, total={global_new})")
 
         except requests.RequestException as e:
-            logger.warning(f"Scrape fetch failed | source={source} details={e}")
+            logger.warning(f"RSS FAILED (network) | source={source} error={e}")
             stats["errors"] += 1
+            stats["failed_sources"].append(source)
         except Exception as e:
-            logger.exception(f"Scrape source error | source={source}")
+            logger.warning(f"RSS FAILED (unexpected) | source={source} error={type(e).__name__}: {e}")
             stats["errors"] += 1
+            stats["failed_sources"].append(source)
 
-    logger.info(f"Scraping complete | stats={stats}")
+    logger.info(
+        f"Scraping complete | new={stats['new_articles']} duplicates={stats['duplicates']} "
+        f"errors={stats['errors']} failed_sources={stats['failed_sources']}"
+    )
     return stats

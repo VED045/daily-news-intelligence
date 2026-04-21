@@ -60,8 +60,35 @@ async def connect_db():
         await _db["news"].create_index("category")
         await _db["news"].create_index("source")
 
-        await _db["top10"].create_index("date", unique=True)
-        await _db["trends"].create_index("date", unique=True)
+        # ── top10: compound unique index (date + language) ──────────────────
+        # Drop old single-field unique index if it exists (caused DuplicateKeyError
+        # when writing multiple languages on the same date).
+        try:
+            top10_indexes = await _db["top10"].index_information()
+            if "date_1" in top10_indexes:
+                logger.warning("⚠️ Dropping old top10.date_1 unique index → replacing with {date,language}")
+                await _db["top10"].drop_index("date_1")
+        except Exception as _ie:
+            logger.debug(f"top10 index drop skipped: {_ie}")
+        await _db["top10"].create_index(
+            [("date", 1), ("language", 1)],
+            unique=True,
+            name="date_language_1",
+        )
+
+        # ── trends: compound unique index (date + language) ───────────────────
+        try:
+            trends_indexes = await _db["trends"].index_information()
+            if "date_1" in trends_indexes:
+                logger.warning("⚠️ Dropping old trends.date_1 unique index → replacing with {date,language}")
+                await _db["trends"].drop_index("date_1")
+        except Exception as _ie:
+            logger.debug(f"trends index drop skipped: {_ie}")
+        await _db["trends"].create_index(
+            [("date", 1), ("language", 1)],
+            unique=True,
+            name="date_language_1",
+        )
         await _db["users"].create_index("email", unique=True)
 
         await _db["bookmarks"].create_index(

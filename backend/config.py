@@ -13,8 +13,10 @@ class Settings:
     mongodb_uri: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017/dailynews")
 
     # ── AI ────────────────────────────────────────────────────────
-    gemini_api_key: str  = os.getenv("GEMINI_API_KEY", "")
-    gemini_model: str    = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    gemini_api_key: str       = os.getenv("GEMINI_API_KEY", "")
+    gemini_model: str         = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    groq_api_key: str         = os.getenv("GROQ_API_KEY", "")
+    openrouter_api_key: str   = os.getenv("OPENROUTER_API_KEY", "")
 
     # ── News API ──────────────────────────────────────────────────
     news_api_key: str    = os.getenv("NEWS_API_KEY", "")

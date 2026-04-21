@@ -157,6 +157,10 @@ async def run_full_pipeline() -> Dict:
     logger.info("🚀 Dainik-Vidya Pipeline — START")
     logger.info("=" * 60)
 
+    # Reset per-run AI provider usage counters
+    from services.ai_service import reset_provider_usage, get_provider_usage
+    reset_provider_usage()
+
     summary = {
         "scraped": 0,
         "news_api": 0,
@@ -164,6 +168,8 @@ async def run_full_pipeline() -> Dict:
         "deduplicated_removed": 0,
         "ai_processed": 0,
         "ai_failed": 0,
+        "gemini_success": 0,
+        "gemini_fallback": 0,
         "errors": [],
     }
 
@@ -206,12 +212,20 @@ async def run_full_pipeline() -> Dict:
         ranked = await get_ranked_unprocessed(settings.max_ai_articles)
         logger.info(f"     Selected {len(ranked)} articles for AI processing")
         ai = await ai_process_ranked(ranked)
-        summary["ai_processed"] = ai.get("processed", 0)
-        summary["ai_failed"] = ai.get("errors", 0)
-        logger.info(f"     AI done: ✅ {ai.get('processed', 0)}  ❌ {ai.get('errors', 0)}")
+        summary["ai_processed"]    = ai.get("processed", 0)
+        summary["ai_failed"]       = ai.get("errors", 0)
+        summary["gemini_success"]  = ai.get("gemini_success", 0)
+        summary["gemini_fallback"] = ai.get("gemini_fallback", 0)
+        logger.info(
+            f"     AI done: ✅ {ai.get('processed', 0)}  "
+            f"gemini_success={ai.get('gemini_success', 0)}  "
+            f"fallback={ai.get('gemini_fallback', 0)}  "
+            f"❌ {ai.get('errors', 0)}"
+        )
     except Exception as e:
         logger.exception("AI processing failed")
         summary["errors"].append(f"ai: {e}")
+
 
     # ── Step 6: Curate ────────────────────────────────────────────
     try:
@@ -249,19 +263,31 @@ async def run_full_pipeline() -> Dict:
     elapsed = round((datetime.now(timezone.utc) - run_start).total_seconds())
     summary["elapsed_seconds"] = elapsed
 
+    # Capture provider usage for summary
+    provider_usage = get_provider_usage()
+    summary["provider_usage"] = provider_usage
+
     logger.info("=" * 60)
     logger.info(f"✅ Pipeline complete ({elapsed}s)")
-    logger.info(f"NewsAPI count: {summary['news_api']}")
-    logger.info(f"RSS count: {summary['scraped']}")
-
+    logger.info("")
+    logger.info("Pipeline Summary:")
+    logger.info(f"  RSS:     {summary['scraped']}")
+    logger.info(f"  NewsAPI: {summary['news_api']}")
     logger.info(
-        f"   merged={summary['merged_total']} "
-        f"dedup_removed={summary['deduplicated_removed']} "
-        f"ai_processed={summary['ai_processed']} "
-        f"failed={summary['ai_failed']}"
+        f"  Gemini:  success={summary['gemini_success']} "
+        f"fallback={summary['gemini_fallback']}"
+    )
+    logger.info(f"  AI processed total: {summary['ai_processed']}")
+    logger.info(f"  Dedup removed:      {summary['deduplicated_removed']}")
+    logger.info(f"  Merged total:       {summary['merged_total']}")
+    logger.info(
+        f"  Provider usage: groq={provider_usage.get('groq', 0)} "
+        f"gemini={provider_usage.get('gemini', 0)} "
+        f"openrouter={provider_usage.get('openrouter', 0)} "
+        f"fallback={provider_usage.get('fallback', 0)}"
     )
     if summary["errors"]:
-        logger.warning(f"Pipeline completed with errors | errors={summary['errors']}")
+        logger.warning(f"  Errors: {summary['errors']}")
     logger.info("=" * 60)
 
     return summary
