@@ -3,13 +3,14 @@ Trends analysis — Dainik-Vidya
 Computes category counts, keyword frequency, and AI insights per language.
 AI calls delegated to the unified ai_service (Groq → Gemini → OpenRouter → fallback).
 """
-from datetime import datetime, date
+from datetime import datetime, timezone
 from typing import Dict, List
 from collections import Counter, defaultdict
 
 from database import get_collection
 from core.logger import get_logger
 from services.ai_service import generate_trends_with_ai
+from utils.timezone import now_ist, get_today_range_ist, ist_to_utc
 
 logger = get_logger()
 
@@ -26,9 +27,11 @@ async def compute_trends() -> Dict:
     """Compute category + keyword trends, and AI insights per language."""
     news_col = get_collection("news")
     trends_col = get_collection("trends")
-    today = date.today().isoformat()
+    today = now_ist().date().isoformat()
 
-    from_date = datetime.combine(date.today(), datetime.min.time())
+    start_ist, _ = get_today_range_ist()
+    from_date = ist_to_utc(start_ist)
+
     cursor = news_col.find({"scraped_at": {"$gte": from_date}})
     all_articles = await cursor.to_list(length=2000)
 
@@ -78,7 +81,7 @@ async def compute_trends() -> Dict:
             "trending_keywords": trending_keywords,
             "most_covered": most_covered,
             "total_articles": len(articles),
-            "computed_at": datetime.utcnow(),
+            "computed_at": datetime.now(timezone.utc),
             "overview": ai_data["overview"],
             "top_themes": ai_data["top_themes"],
             "category_insights": ai_data["category_insights"],

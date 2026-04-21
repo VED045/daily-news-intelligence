@@ -19,6 +19,7 @@ from database import get_collection
 from models.schemas import PreferencesUpdate
 from routes.deps import get_current_user
 from core.logger import get_logger
+from utils.timezone import IST, get_today_range_ist, ist_to_utc
 
 router = APIRouter()
 logger = get_logger()
@@ -51,6 +52,14 @@ def _serialize(doc: dict) -> dict:
 
     # Map frontend fields
     doc["publishedAt"] = doc.get("published_at")
+    
+    # ── Convert published_at to IST for frontend ──
+    pub = doc.get("published_at")
+    if pub and hasattr(pub, "astimezone"):
+        doc["published_at_ist"] = pub.astimezone(IST).isoformat()
+    else:
+        doc["published_at_ist"] = None
+        
     doc["imageUrl"] = doc.get("image_url")
     doc["importanceScore"] = doc.get("importance_score")
     doc["contentPreview"] = doc.get("content_preview", "")
@@ -167,18 +176,26 @@ async def get_personalized_feed(
             {"language": {"$exists": False}},
         ]
 
-    # Date filter
+    # Date filter in IST, converted to UTC for DB
     if date_from:
-        start = datetime.fromisoformat(date_from)
+        # Assuming frontend sends YYYY-MM-DD
+        start_ist = IST.localize(datetime.strptime(date_from, "%Y-%m-%d"))
     else:
-        start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        start_ist, _ = get_today_range_ist()
 
     if date_to:
-        end = datetime.fromisoformat(date_to)
+        end_ist = IST.localize(datetime.strptime(date_to, "%Y-%m-%d")) + timedelta(days=1)
     else:
-        end = start + timedelta(days=1)
+        _, end_ist = get_today_range_ist()
 
-    query["scraped_at"] = {"$gte": start, "$lt": end}
+    start_utc = ist_to_utc(start_ist)
+    end_utc = ist_to_utc(end_ist)
+
+    logger.info(f"IST now: {now_ist()}")
+    logger.info(f"UTC now: {datetime.now(timezone.utc)}")
+    logger.info(f"Query range UTC: {start_utc} → {end_utc}")
+
+    query["scraped_at"] = {"$gte": start_utc, "$lt": end_utc}
 
     if source:
         query["source"] = {"$regex": source, "$options": "i"}
@@ -198,7 +215,7 @@ async def get_personalized_feed(
             f"Personalized feed empty → fallback used | "
             f"user={user['email']} lang={preferred_lang} topics={preferred}"
         )
-        fallback_query: dict = {"scraped_at": {"$gte": start, "$lt": end}}
+        fallback_query: dict = {"scraped_at": {"$gte": start_utc, "$lt": end_utc}}
         if source:
             fallback_query["source"] = {"$regex": source, "$options": "i"}
         if category and category.lower() not in ("all", ""):

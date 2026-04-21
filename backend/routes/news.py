@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 from database import get_collection
 from core.logger import get_logger
+from utils.timezone import IST, ist_to_utc
 
 router = APIRouter()
 logger = get_logger()
@@ -41,6 +42,14 @@ def _serialize(doc: dict) -> dict:
 
     # Alias publishedAt for frontend compatibility
     doc["publishedAt"]     = doc.get("published_at")
+    
+    # ── Convert published_at to IST for frontend ──
+    pub = doc.get("published_at")
+    if pub and hasattr(pub, "astimezone"):
+        doc["published_at_ist"] = pub.astimezone(IST).isoformat()
+    else:
+        doc["published_at_ist"] = None
+        
     doc["imageUrl"]        = doc.get("image_url")
     doc["importanceScore"] = doc.get("importance_score") or 5
 
@@ -83,25 +92,23 @@ def _apply_sports_cap(articles: List[dict], cap: int = MAX_SPORTS_IN_FEED) -> Li
 
 
 def _parse_date_range(date_from: Optional[str], date_to: Optional[str]):
-    """Parse date range strings into datetime objects. Returns (start, end) or (None, None)."""
+    """Parse date range strings into datetime objects. Returns (start_utc, end_utc) or (None, None)."""
     if not date_from:
         return None, None
     try:
-        start = datetime.fromisoformat(date_from)
-        if start.tzinfo is None:
-            start = start.replace(tzinfo=timezone.utc)
+        start_ist = IST.localize(datetime.strptime(date_from, "%Y-%m-%d"))
     except ValueError:
         return None, None
+        
     if date_to:
         try:
-            end = datetime.fromisoformat(date_to)
-            if end.tzinfo is None:
-                end = end.replace(tzinfo=timezone.utc)
+            end_ist = IST.localize(datetime.strptime(date_to, "%Y-%m-%d")) + timedelta(days=1)
         except ValueError:
-            end = start + timedelta(days=1)
+            end_ist = start_ist + timedelta(days=1)
     else:
-        end = start + timedelta(days=1)
-    return start, end
+        end_ist = start_ist + timedelta(days=1)
+        
+    return ist_to_utc(start_ist), ist_to_utc(end_ist)
 
 
 @router.get("/sources")
@@ -135,9 +142,9 @@ async def get_category_counts(
             ]
         }
 
-        start, end = _parse_date_range(date_from, date_to)
-        if start and end:
-            query["scraped_at"] = {"$gte": start, "$lt": end}
+        start_utc, end_utc = _parse_date_range(date_from, date_to)
+        if start_utc and end_utc:
+            query["scraped_at"] = {"$gte": start_utc, "$lt": end_utc}
 
         pipeline = [
             {"$match": query},
@@ -180,10 +187,12 @@ async def get_news(
         }
 
         # Date range filter
-        start, end = _parse_date_range(date_from, date_to)
-        if start and end:
-            query["scraped_at"] = {"$gte": start, "$lt": end}
-            logger.info(f"Date range: {start} → {end}")
+        start_utc, end_utc = _parse_date_range(date_from, date_to)
+        if start_utc and end_utc:
+            query["scraped_at"] = {"$gte": start_utc, "$lt": end_utc}
+            logger.info(f"IST now: {IST.localize(datetime.now())}")
+            logger.info(f"UTC now: {datetime.now(timezone.utc)}")
+            logger.info(f"Query range UTC: {start_utc} → {end_utc}")
 
         # Source filter
         if source:

@@ -2,8 +2,9 @@
 Analytics and trend data routes.
 """
 from fastapi import APIRouter, HTTPException
-from datetime import date
 from database import get_collection
+from core.logger import get_logger
+from utils.timezone import now_ist
 from core.logger import get_logger
 
 router = APIRouter()
@@ -15,7 +16,7 @@ async def get_trends(language: str = "en"):
     """Get today's trend analysis data for a specific language."""
     try:
         collection = get_collection("trends")
-        today = date.today().isoformat()
+        today = now_ist().date().isoformat()
 
         fallback_query = {"$or": [{"language": language}, {"language": {"$exists": False}}]}
 

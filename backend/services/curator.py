@@ -5,8 +5,10 @@ Now uses the unified AI service (Groq → Gemini → OpenRouter → fallback).
 Strict output validation: valid JSON, required fields, URL integrity.
 """
 import asyncio
-from datetime import datetime, timezone, date, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional
+
+from utils.timezone import now_ist
 
 from database import get_collection
 from core.logger import get_logger
@@ -112,7 +114,7 @@ async def curate_top10() -> Dict:
     Client-side slices to user preference (5/10/20).
     Never crashes pipeline.
     """
-    today = date.today().isoformat()
+    today = now_ist().date().isoformat()
     top10_col = get_collection("top10")
     articles = await _load_candidate_articles(200)
 

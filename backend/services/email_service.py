@@ -9,6 +9,7 @@ from typing import Dict, List
 from database import get_collection
 from config import settings
 from core.logger import get_logger
+from utils.timezone import now_ist
 
 logger = get_logger()
 
@@ -78,7 +79,7 @@ async def send_daily_digest() -> Dict:
     top10_col = get_collection("top10")
     trends_col = get_collection("trends")
 
-    today = date.today().isoformat()
+    today = now_ist().date().isoformat()
     top10_doc = await top10_col.find_one({"date": today}) or {}
     trends_doc = await trends_col.find_one({"date": today}) or {}
 
