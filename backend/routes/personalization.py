@@ -7,7 +7,11 @@ PUT  /me/preferences   — update preferred_topics + top_n_preference
 POST /me/subscribe     — set is_subscribed_email = True (idempotent)
 POST /me/unsubscribe   — set is_subscribed_email = False (idempotent)
 GET  /me/feed          — personalized news feed
+""""""
+Personalization routes — Dainik-Vidya
+All endpoints require authentication.
 """
+
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -35,19 +39,27 @@ SPORTS_CATEGORIES = {"sports"}
 MAX_SPORTS_IN_FEED = 1
 
 
+# ✅ FIXED SERIALIZER
 def _serialize(doc: dict) -> dict:
     """Convert MongoDB doc to JSON-safe dict."""
     doc["_id"] = str(doc["_id"])
+
     for field in ("published_at", "scraped_at", "processed_at"):
         val = doc.get(field)
         if val and hasattr(val, "isoformat"):
             doc[field] = val.isoformat() if val.tzinfo else val.isoformat() + "Z"
-    doc["publishedAt"]     = doc.get("published_at")
-    doc["imageUrl"]        = doc.get("image_url")
+
+    # Map frontend fields
+    doc["publishedAt"] = doc.get("published_at")
+    doc["imageUrl"] = doc.get("image_url")
     doc["importanceScore"] = doc.get("importance_score")
-    doc["sourceType"] = "News API" if raw_st == "newsapi" else "Scraped"
-    doc["contentPreview"]  = doc.get("content_preview", "")
+    doc["contentPreview"] = doc.get("content_preview", "")
     doc["language"] = doc.get("language", "en")
+
+    # ✅ FIX: define source_type safely
+    raw_st = doc.get("source_type", "rss")
+    doc["sourceType"] = "News API" if raw_st == "newsapi" else "Scraped"
+
     return doc
 
 
@@ -55,11 +67,11 @@ def _serialize(doc: dict) -> dict:
 
 @router.get("/preferences")
 async def get_preferences(user: dict = Depends(get_current_user)):
-    """Return current user's personalization preferences."""
     users_col = get_collection("users")
     doc = await users_col.find_one({"email": user["email"]})
     if not doc:
         raise HTTPException(status_code=404, detail="User not found")
+
     return {
         "preferred_topics": doc.get("preferred_topics", []),
         "top_n_preference": doc.get("top_n_preference", 10),
@@ -73,12 +85,10 @@ async def update_preferences(
     body: PreferencesUpdate,
     user: dict = Depends(get_current_user),
 ):
-    """Update preferred topics and/or top_n_preference."""
     users_col = get_collection("users")
     updates: dict = {"updated_at": datetime.now(timezone.utc)}
 
     if body.preferred_topics is not None:
-        # Validate all topics
         cleaned = [t.lower() for t in body.preferred_topics if t.lower() in VALID_TOPICS]
         updates["preferred_topics"] = cleaned
 
@@ -96,31 +106,32 @@ async def update_preferences(
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
 
-    return {"message": "Preferences updated", "updates": {k: v for k, v in updates.items() if k != "updated_at"}}
+    return {
+        "message": "Preferences updated",
+        "updates": {k: v for k, v in updates.items() if k != "updated_at"},
+    }
 
 
-# ── Subscription (idempotent) ────────────────────────────────
+# ── Subscription ─────────────────────────────────────────────
 
 @router.post("/subscribe")
 async def subscribe_email(user: dict = Depends(get_current_user)):
-    """Set is_subscribed_email = True (idempotent)."""
     users_col = get_collection("users")
     await users_col.update_one(
         {"email": user["email"]},
         {"$set": {"is_subscribed_email": True, "updated_at": datetime.now(timezone.utc)}},
     )
-    return {"message": "Subscribed to daily email digest.", "is_subscribed_email": True}
+    return {"message": "Subscribed", "is_subscribed_email": True}
 
 
 @router.post("/unsubscribe")
 async def unsubscribe_email(user: dict = Depends(get_current_user)):
-    """Set is_subscribed_email = False (idempotent)."""
     users_col = get_collection("users")
     await users_col.update_one(
         {"email": user["email"]},
         {"$set": {"is_subscribed_email": False, "updated_at": datetime.now(timezone.utc)}},
     )
-    return {"message": "Unsubscribed from daily email digest.", "is_subscribed_email": False}
+    return {"message": "Unsubscribed", "is_subscribed_email": False}
 
 
 # ── Personalized Feed ────────────────────────────────────────
@@ -129,92 +140,59 @@ async def unsubscribe_email(user: dict = Depends(get_current_user)):
 async def get_personalized_feed(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=50),
-    date_from: Optional[str] = Query(None, description="ISO date e.g. 2026-04-21"),
+    date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     source: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     user: dict = Depends(get_current_user),
 ):
-    """Personalized feed: filters by user's preferred_topics, sorted by
-    topic priority → importance_score → recency."""
     users_col = get_collection("users")
-    news_col  = get_collection("news")
+    news_col = get_collection("news")
 
-    # Load user preferences
     user_doc = await users_col.find_one({"email": user["email"]})
     preferred = user_doc.get("preferred_topics", []) if user_doc else []
     preferred_lang = user_doc.get("preferred_language", "en") if user_doc else "en"
 
-    # Build query
     query: dict = {"language": preferred_lang}
 
-    # Date range filter
+    # Date filter
     if date_from:
-        try:
-            start = datetime.fromisoformat(date_from)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date_from format")
+        start = datetime.fromisoformat(date_from)
     else:
         start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
     if date_to:
-        try:
-            end = datetime.fromisoformat(date_to)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date_to format")
+        end = datetime.fromisoformat(date_to)
     else:
         end = start + timedelta(days=1)
+
     query["scraped_at"] = {"$gte": start, "$lt": end}
 
-    # Source filter
     if source:
         query["source"] = {"$regex": source, "$options": "i"}
 
-    # Category filter (explicit overrides personalization)
     if category and category.lower() not in ("all", ""):
         query["category"] = {"$regex": category, "$options": "i"}
     elif preferred:
         query["category"] = {"$in": preferred}
 
-    # Fetch large pool for post-sort
     pool_size = max(limit * 10, 100)
     cursor = news_col.find(query).sort("scraped_at", -1).limit(pool_size)
+
     pool = [_serialize(doc) async for doc in cursor]
 
-    # Custom sort by preference priority → importance → recency
+    # Sorting
     if preferred:
         priority_map = {topic: i for i, topic in enumerate(preferred)}
 
         def sort_key(a):
             p = priority_map.get(a.get("category", "general"), 999)
-            score = -(a.get("importance_score") or a.get("importanceScore") or 5)
-            pub = a.get("published_at")
-            ts = 0
-            if pub and hasattr(pub, "timestamp"):
-                ts = -pub.timestamp()
-            elif isinstance(pub, str):
-                try:
-                    ts = -datetime.fromisoformat(pub.replace("Z", "+00:00")).timestamp()
-                except Exception:
-                    ts = 0
-            return (p, score, ts)
+            score = -(a.get("importanceScore") or 5)
+            return (p, score)
 
         pool.sort(key=sort_key)
     else:
-        # Default: importance_score → recency
-        def default_key(a):
-            score = -(a.get("importance_score") or a.get("importanceScore") or 5)
-            pub = a.get("published_at")
-            ts = 0
-            if pub and hasattr(pub, "timestamp"):
-                ts = -pub.timestamp()
-            elif isinstance(pub, str):
-                try:
-                    ts = -datetime.fromisoformat(pub.replace("Z", "+00:00")).timestamp()
-                except Exception:
-                    ts = 0
-            return (score, ts)
-
-        pool.sort(key=default_key)
+        pool.sort(key=lambda a: -(a.get("importanceScore") or 5))
 
     # Sports cap
     result, sports_seen = [], 0
@@ -226,7 +204,6 @@ async def get_personalized_feed(
         else:
             result.append(a)
 
-    # Paginate
     skip = (page - 1) * limit
     page_items = result[skip: skip + limit]
 
