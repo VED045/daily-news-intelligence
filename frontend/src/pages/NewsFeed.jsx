@@ -6,7 +6,7 @@ import NewsCard from '../components/NewsCard'
 import CategoryFilter from '../components/CategoryFilter'
 import SearchBar from '../components/SearchBar'
 import { CardSkeleton } from '../components/Skeleton'
-import { useTheme, useAuth } from '../App'
+import { useTheme, useAuth, useLanguage } from '../App'
 
 const PAGE_SIZE = 10
 
@@ -16,10 +16,20 @@ const DATE_OPTIONS = [
   { id: '7days',  label: 'Last 7 Days' },
 ]
 
-function getDateRange(option) {
+function getDateRange(option, specificDay = '') {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const todayISO = today.toISOString().split('T')[0]
+
+  if (specificDay !== '') {
+    const dStart = new Date(today)
+    dStart.setDate(dStart.getDate() - parseInt(specificDay))
+    const dEnd = new Date(dStart)
+    dEnd.setDate(dEnd.getDate() + 1)
+    return { 
+      date_from: dStart.toISOString().split('T')[0],
+      date_to: dEnd.toISOString().split('T')[0]
+    }
+  }
 
   if (option === '3days') {
     const d = new Date(today)
@@ -37,6 +47,7 @@ function getDateRange(option) {
 export default function NewsFeed() {
   const { dark } = useTheme()
   const { auth } = useAuth()
+  const { language } = useLanguage()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const urlQuery = searchParams.get('q') || ''
@@ -52,6 +63,7 @@ export default function NewsFeed() {
 
   // Filters
   const [dateFilter, setDateFilter] = useState('today')
+  const [specificDay, setSpecificDay] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
   const [sources, setSources] = useState([])
   const [categoryCounts, setCategoryCounts] = useState(null)
@@ -63,11 +75,10 @@ export default function NewsFeed() {
     getNewsSources().then(d => setSources(d.sources || [])).catch(() => {})
   }, [])
 
-  // Load category counts when date filter changes
   useEffect(() => {
-    const range = getDateRange(dateFilter)
+    const range = getDateRange(dateFilter, specificDay)
     getCategoryCounts(range).then(d => setCategoryCounts(d.category_counts || {})).catch(() => {})
-  }, [dateFilter])
+  }, [dateFilter, specificDay])
 
   // Sync personalized toggle with auth
   useEffect(() => {
@@ -89,20 +100,22 @@ export default function NewsFeed() {
     try {
       let data
       if (q && q.length >= 2) {
-        data = await searchNews(q, pg)
+        data = await searchNews(q, pg) // note: search doesn't accept language right now, kept as is
       } else if (auth && usePersonalized) {
-        const filters = { ...getDateRange(dateFilter) }
+        const filters = { ...getDateRange(dateFilter, specificDay) }
         if (sourceFilter) filters.source = sourceFilter
         data = await getMyFeed({
           page: pg,
           limit: PAGE_SIZE,
           category: cat === 'all' ? undefined : cat,
-          ...filters,
+          source: sourceFilter || undefined,
+          date_from: filters.date_from || undefined,
+          date_to: filters.date_to || undefined
         })
       } else {
-        const filters = getDateRange(dateFilter)
+        const filters = getDateRange(dateFilter, specificDay)
         if (sourceFilter) filters.source = sourceFilter
-        data = await getNews(cat === 'all' ? '' : cat, pg, PAGE_SIZE, '', filters)
+        data = await getNews(cat === 'all' ? '' : cat, pg, PAGE_SIZE, '', filters, language)
       }
       setArticles(prev => pg === 1 ? data.articles : [...prev, ...data.articles])
       setHasMore(data.has_more)
@@ -111,7 +124,7 @@ export default function NewsFeed() {
     } finally {
       setLoading(false)
     }
-  }, [auth, usePersonalized, dateFilter, sourceFilter])
+  }, [auth, usePersonalized, dateFilter, specificDay, sourceFilter, language])
 
   // Fetch when page / category / query / filters change
   useEffect(() => {
@@ -152,6 +165,7 @@ export default function NewsFeed() {
 
   const resetFilters = () => {
     setDateFilter('today')
+    setSpecificDay('')
     setSourceFilter('')
     setArticles([])
     setPage(1)
@@ -221,7 +235,7 @@ export default function NewsFeed() {
                 {DATE_OPTIONS.map(opt => (
                   <button
                     key={opt.id}
-                    onClick={() => { setDateFilter(opt.id); setArticles([]); setPage(1); setHasMore(true) }}
+                    onClick={() => { setDateFilter(opt.id); setSpecificDay(''); setArticles([]); setPage(1); setHasMore(true) }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                       dateFilter === opt.id
                         ? 'bg-primary-500 text-white border-primary-500'
@@ -234,6 +248,38 @@ export default function NewsFeed() {
                   </button>
                 ))}
               </div>
+              
+              {/* Day-wise exact filter */}
+              {dateFilter === '7days' && (
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
+                  <button
+                    onClick={() => { setSpecificDay(''); setArticles([]); setPage(1); setHasMore(true) }}
+                    className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
+                      specificDay === ''
+                        ? 'bg-slate-600 text-white border-slate-600'
+                        : dark ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-white text-slate-500 border-slate-200'
+                    }`}
+                  >
+                    All 7 Days
+                  </button>
+                  {[...Array(8)].map((_, i) => {
+                    const label = i === 0 ? 'Today' : i === 1 ? 'Yesterday' : `${i} days ago`
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => { setSpecificDay(i.toString()); setArticles([]); setPage(1); setHasMore(true) }}
+                        className={`px-2 py-1 rounded text-[10px] font-medium border transition-all whitespace-nowrap ${
+                          specificDay === i.toString()
+                            ? 'bg-slate-600 text-white border-slate-600'
+                            : dark ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-white text-slate-500 border-slate-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
             {/* Source filter */}
             <div>

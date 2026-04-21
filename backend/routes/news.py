@@ -44,12 +44,12 @@ def _serialize(doc: dict) -> dict:
     doc["imageUrl"]        = doc.get("image_url")
     doc["importanceScore"] = doc.get("importance_score") or 5
 
-    # Source type: "News API" for newsapi.org articles, "Scraped" for RSS
     raw_st = doc.get("source_type", "rss")
     doc["sourceType"] = "News API" if raw_st == "newsapi" else "Scraped"
 
     # Content preview (5-6 lines of article body)
     doc["contentPreview"] = doc.get("content_preview", "")
+    doc["language"] = doc.get("language", "en")
 
     return doc
 
@@ -154,14 +154,15 @@ async def get_news(
     date_from: Optional[str] = Query(None, description="ISO date e.g. 2026-04-21"),
     date_to:  Optional[str] = Query(None),
     source:   Optional[str] = Query(None, description="Filter by source name"),
+    language: str           = Query("en", description="Filter by language (en, hi, mr, te)"),
 ):
     """
     Return priority-sorted news articles.
-    Supports date range, source, category, and topic filters.
+    Supports date range, source, category, language, and topic filters.
     """
     try:
         collection = get_collection("news")
-        query: dict = {}
+        query: dict = {"language": language}
 
         # Date range filter
         start, end = _parse_date_range(date_from, date_to)

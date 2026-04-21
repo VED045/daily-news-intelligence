@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useTheme, APP_NAME, useAuth } from '../App'
+import { useTheme, APP_NAME, useAuth, useLanguage } from '../App'
 import {
   Newspaper, BarChart3, Star, Mail, Bookmark,
   Sun, Moon, Menu, X, Zap, RefreshCw, LogOut, LogIn, Settings
@@ -11,6 +11,7 @@ import toast from 'react-hot-toast'
 export default function Navbar() {
   const { dark, toggle } = useTheme()
   const { auth, setAuth } = useAuth()
+  const { language, setLanguage } = useLanguage()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -153,6 +154,20 @@ export default function Navbar() {
               <LogIn size={14} /> Login
             </Link>
           )}
+
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className={`cursor-pointer w-12 h-9 flex items-center justify-center rounded-lg transition-all text-xs font-semibold uppercase ${
+              dark ? 'bg-slate-800 text-slate-300 border border-slate-700' : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+            }`}
+            title="Language"
+          >
+            <option value="en">EN</option>
+            <option value="hi">HI</option>
+            <option value="mr">MR</option>
+            <option value="te">TE</option>
+          </select>
 
           <button
             onClick={toggle}

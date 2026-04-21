@@ -4,10 +4,11 @@ import { BarChart3, TrendingUp, RefreshCw, AlertTriangle, Layers } from 'lucide-
 import { getTrends, getTrendHistory } from '../services/api'
 import { CategoryBarChart, KeywordCloud } from '../components/TrendChart'
 import { TrendSkeleton } from '../components/Skeleton'
-import { useTheme } from '../App'
+import { useTheme, useLanguage } from '../App'
 
 export default function Trends() {
   const { dark } = useTheme()
+  const { language } = useLanguage()
   const navigate = useNavigate()
   const [trends, setTrends] = useState(null)
   const [history, setHistory] = useState([])
@@ -17,7 +18,7 @@ export default function Trends() {
   const load = async () => {
     setLoading(true); setError(null)
     try {
-      const [tr, hist] = await Promise.all([getTrends(), getTrendHistory(7)])
+      const [tr, hist] = await Promise.all([getTrends(language), getTrendHistory(7, language)])
       setTrends(tr)
       setHistory(hist.history || [])
     } catch {
@@ -26,7 +27,7 @@ export default function Trends() {
       setLoading(false)
     }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [language])
 
   // Click a trending keyword → go to News Feed filtered by that topic
   const handleKeywordClick = (word) => {
@@ -67,6 +68,62 @@ export default function Trends() {
       {error && (
         <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-2xl px-5 py-4 mb-8 text-red-400 text-sm">
           <AlertTriangle size={18} /> {error}
+        </div>
+      )}
+
+      {/* AI Summary and Insights */}
+      {!loading && trends && trends.overview && (
+        <div className="grid lg:grid-cols-3 gap-6 mb-8 animate-slide-up">
+          
+          {/* AI Summary */}
+          <div className={`${panel} lg:col-span-2 relative overflow-hidden`}>
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <TrendingUp size={100} />
+            </div>
+            <h2 className={`font-semibold text-lg mb-3 flex items-center gap-2 ${dark ? 'text-primary-400' : 'text-primary-600'}`}>
+              <BarChart3 size={20} /> Today's Overview
+            </h2>
+            <p className={`text-sm leading-relaxed ${dark ? 'text-slate-300' : 'text-slate-700'}`}>
+              {trends.overview}
+            </p>
+          </div>
+
+          {/* Top Themes & Category Insights */}
+          <div className={`${panel} flex flex-col gap-6`}>
+            <div>
+              <h2 className={`font-semibold text-sm mb-3 flex items-center gap-1.5 ${dark ? 'text-purple-400' : 'text-purple-600'}`}>
+                <Layers size={16} /> Top Themes
+              </h2>
+              {trends.top_themes?.length > 0 ? (
+                <ul className="space-y-2">
+                  {trends.top_themes.map((theme, i) => (
+                    <li key={i} className={`text-sm flex items-start gap-2 ${dark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      <span className="text-purple-500 mt-1 text-[10px]">●</span> {theme}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className={`text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>No themes identified today.</p>
+              )}
+            </div>
+
+            {Object.keys(trends.category_insights || {}).length > 0 && (
+              <div>
+                <h2 className={`font-semibold text-sm mb-3 flex items-center gap-1.5 ${dark ? 'text-cyan-400' : 'text-cyan-600'}`}>
+                  <BarChart3 size={16} /> Category Insights
+                </h2>
+                <div className="space-y-3">
+                  {Object.entries(trends.category_insights).map(([cat, insight]) => (
+                    <div key={cat} className={`p-3 rounded-lg border ${dark ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-100'}`}>
+                      <div className="text-xs font-bold capitalize text-cyan-500 mb-1">{cat}</div>
+                      <div className={`text-xs ${dark ? 'text-slate-300' : 'text-slate-700'}`}>{insight}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 

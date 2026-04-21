@@ -11,21 +11,25 @@ logger = get_logger()
 
 
 @router.get("")
-async def get_trends():
-    """Get today's trend analysis data."""
+async def get_trends(language: str = "en"):
+    """Get today's trend analysis data for a specific language."""
     try:
         collection = get_collection("trends")
         today = date.today().isoformat()
 
-        doc = await collection.find_one({"date": today})
+        doc = await collection.find_one({"date": today, "language": language})
         if not doc:
-            doc = await collection.find_one({}, sort=[("date", -1)])
+            doc = await collection.find_one({"language": language}, sort=[("date", -1)])
 
         if not doc:
             return {
                 "date": today,
+                "language": language,
                 "category_counts": {},
                 "trending_keywords": [],
+                "top_themes": [],
+                "overview": "Trend data not yet generated for this language.",
+                "category_insights": {},
                 "most_covered": "N/A",
                 "total_articles": 0,
                 "message": "Trend data not yet generated.",
@@ -41,11 +45,11 @@ async def get_trends():
 
 
 @router.get("/history")
-async def get_trend_history(days: int = 7):
+async def get_trend_history(days: int = 7, language: str = "en"):
     """Get trend history for the past N days."""
     try:
         collection = get_collection("trends")
-        cursor = collection.find({}).sort("date", -1).limit(days)
+        cursor = collection.find({"language": language}).sort("date", -1).limit(days)
         history = []
         async for doc in cursor:
             doc["_id"] = str(doc["_id"])

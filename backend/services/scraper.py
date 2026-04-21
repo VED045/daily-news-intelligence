@@ -30,7 +30,7 @@ HEADERS = {
 }
 
 # Max articles to add per pipeline run (keeps us well under any API/server limits)
-MAX_TOTAL_NEW = 100
+MAX_TOTAL_NEW = 250
 
 # How many entries to pull per feed (non-sports)
 DEFAULT_FEED_LIMIT = 8
@@ -40,34 +40,41 @@ SPORTS_FEED_LIMIT = 2
 
 # RSS Feed configuration  — is_sports=True → hard-capped
 RSS_FEEDS = [
-    # ── BBC ──────────────────────────────────────────────────────────────────
-    {"url": "http://feeds.bbci.co.uk/news/rss.xml",         "source": "BBC News",        "category": "general",  "is_sports": False},
-    {"url": "http://feeds.bbci.co.uk/news/world/rss.xml",   "source": "BBC World",        "category": "world",    "is_sports": False},
-    {"url": "http://feeds.bbci.co.uk/news/politics/rss.xml","source": "BBC Politics",     "category": "politics", "is_sports": False},
-    {"url": "http://feeds.bbci.co.uk/sport/rss.xml",        "source": "BBC Sport",        "category": "sports",   "is_sports": True},
-    # ── Reuters ──────────────────────────────────────────────────────────────
-    {"url": "https://feeds.reuters.com/reuters/topNews",     "source": "Reuters",          "category": "general",  "is_sports": False},
-    {"url": "https://feeds.reuters.com/reuters/worldNews",   "source": "Reuters World",    "category": "world",    "is_sports": False},
-    {"url": "https://feeds.reuters.com/reuters/businessNews","source": "Reuters Business", "category": "business", "is_sports": False},
-    # ── The Hindu ────────────────────────────────────────────────────────────
-    {"url": "https://www.thehindu.com/feeder/default.rss",                          "source": "The Hindu",           "category": "india",    "is_sports": False},
-    {"url": "https://www.thehindu.com/news/international/feeder/default.rss",       "source": "The Hindu World",     "category": "world",    "is_sports": False},
-    {"url": "https://www.thehindu.com/business/feeder/default.rss",                 "source": "The Hindu Business",  "category": "business", "is_sports": False},
-    {"url": "https://www.thehindu.com/news/national/feeder/default.rss",            "source": "The Hindu National",  "category": "politics", "is_sports": False},
-    # ── Times of India ───────────────────────────────────────────────────────
-    {"url": "https://timesofindia.indiatimes.com/rssfeedstopstories.cms",  "source": "Times of India",  "category": "india",    "is_sports": False},
-    {"url": "https://timesofindia.indiatimes.com/rssfeeds/296589292.cms",  "source": "TOI Business",    "category": "business", "is_sports": False},
-    {"url": "https://timesofindia.indiatimes.com/rssfeeds/4719148.cms",    "source": "TOI Sports",      "category": "sports",   "is_sports": True},
-    # ── ESPN ─────────────────────────────────────────────────────────────────
-    {"url": "https://www.espn.com/espn/rss/news",           "source": "ESPN",             "category": "sports",   "is_sports": True},
-    # ── Moneycontrol ─────────────────────────────────────────────────────────
-    {"url": "https://www.moneycontrol.com/rss/latestnews.xml",    "source": "Moneycontrol",         "category": "finance",  "is_sports": False},
-    {"url": "https://www.moneycontrol.com/rss/marketreports.xml", "source": "Moneycontrol Markets", "category": "finance",  "is_sports": False},
-    # ── FINANCE sources ──────────────────────────────────────────────────────
-    {"url": "https://finance.yahoo.com/news/rssindex",             "source": "Yahoo Finance",  "category": "finance",  "is_sports": False},
-    {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html","source": "CNBC",          "category": "finance",  "is_sports": False},
-    {"url": "https://www.cnbc.com/id/10000664/device/rss/rss.html", "source": "CNBC Markets", "category": "finance",  "is_sports": False},
-    {"url": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml", "source": "NYT Business","category": "finance", "is_sports": False},
+    # ── ENGLISH ──────────────────────────────────────────────────────────────
+    # BBC
+    {"url": "http://feeds.bbci.co.uk/news/rss.xml",         "source": "BBC News",        "category": "general",  "language": "en"},
+    {"url": "http://feeds.bbci.co.uk/news/world/rss.xml",   "source": "BBC World",        "category": "world",    "language": "en"},
+    {"url": "http://feeds.bbci.co.uk/news/politics/rss.xml","source": "BBC Politics",     "category": "politics", "language": "en"},
+    {"url": "http://feeds.bbci.co.uk/sport/rss.xml",        "source": "BBC Sport",        "category": "sports",   "is_sports": True, "language": "en"},
+    # Reuters
+    {"url": "https://feeds.reuters.com/reuters/topNews",     "source": "Reuters",          "category": "general",  "language": "en"},
+    {"url": "https://feeds.reuters.com/reuters/worldNews",   "source": "Reuters World",    "category": "world",    "language": "en"},
+    {"url": "https://feeds.reuters.com/reuters/businessNews","source": "Reuters Business", "category": "business", "language": "en"},
+    # Firstpost
+    {"url": "https://www.firstpost.com/rss/world.xml",      "source": "Firstpost World",  "category": "world",    "language": "en"},
+    {"url": "https://www.firstpost.com/rss/india.xml",      "source": "Firstpost India",  "category": "india",    "language": "en"},
+    # Others
+    {"url": "https://www.thehindu.com/feeder/default.rss",  "source": "The Hindu",        "category": "india",    "language": "en"},
+    {"url": "https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "source": "Times of India", "category": "india", "language": "en"},
+    {"url": "https://www.espn.com/espn/rss/news",           "source": "ESPN",             "category": "sports",   "is_sports": True, "language": "en"},
+    # FINANCE sources
+    {"url": "https://finance.yahoo.com/news/rssindex",             "source": "Yahoo Finance",  "category": "finance", "language": "en"},
+    {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html","source": "CNBC",          "category": "finance", "language": "en"},
+    {"url": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml", "source": "NYT Business","category": "finance", "language": "en"},
+
+    # ── HINDI ─────────────────────────────────────────────────────────────────
+    {"url": "https://feeds.feedburner.com/ndtvkhabar",      "source": "NDTV Hindi",       "category": "india",    "language": "hi"},
+    {"url": "https://www.aajtak.in/rssfeeds/?id=home",      "source": "Aaj Tak",          "category": "india",    "language": "hi"},
+    {"url": "https://hindi.firstpost.com/rss/news.xml",     "source": "Firstpost Hindi",  "category": "india",    "language": "hi"},
+
+    # ── MARATHI ───────────────────────────────────────────────────────────────
+    {"url": "https://www.lokmat.com/rss/latest-news.xml",   "source": "Lokmat",           "category": "india",    "language": "mr"},
+    {"url": "https://www.esakal.com/feed",                  "source": "Sakal",            "category": "india",    "language": "mr"},
+    {"url": "https://www.loksatta.com/feed/",               "source": "Loksatta",         "category": "india",    "language": "mr"},
+
+    # ── TELUGU ────────────────────────────────────────────────────────────────
+    {"url": "https://www.sakshi.com/rss/home",              "source": "Sakshi",           "category": "india",    "language": "te"},
+    {"url": "https://www.eenadu.net/telugu-news/rss",       "source": "Eenadu",           "category": "india",    "language": "te"},
 ]
 
 CATEGORY_MAP = {
@@ -207,6 +214,7 @@ async def scrape_all_feeds() -> Dict[str, int]:
         source = feed_cfg["source"]
         default_category = feed_cfg["category"]
         is_sports = feed_cfg.get("is_sports", False)
+        language = feed_cfg.get("language", "en")
         per_feed_limit = SPORTS_FEED_LIMIT if is_sports else DEFAULT_FEED_LIMIT
 
         try:
@@ -253,6 +261,7 @@ async def scrape_all_feeds() -> Dict[str, int]:
                     "summary": summary,
                     "content_preview": content_preview,  # 5-6 lines from <p> tags
                     "source_type": "rss",                # "rss" for all scraped articles
+                    "language": language,                # en, hi, mr, te
                     "ai_title": None,
                     "ai_summary": None,
                     "keywords": [],

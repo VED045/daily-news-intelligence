@@ -41,11 +41,11 @@ def _build_html(top10: List[Dict], headlines: List[Dict], trends: Dict, date_str
 
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Daily News Intelligence</title></head>
+<title>Dainik Vidya</title></head>
 <body style="background:#0f172a;color:#e2e8f0;font-family:'Helvetica Neue',Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;">
   <div style="text-align:center;padding:28px 0 20px;">
     <div style="font-size:32px;margin-bottom:8px;">📰</div>
-    <h1 style="color:#818cf8;font-size:26px;margin:0 0 4px;">Daily News Intelligence</h1>
+    <h1 style="color:#818cf8;font-size:26px;margin:0 0 4px;">Dainik Vidya</h1>
     <p style="color:#475569;font-size:14px;margin:0;">{date_str}</p>
   </div>
   <div style="background:#1a2540;border-radius:12px;padding:24px;margin-bottom:20px;">
@@ -61,7 +61,7 @@ def _build_html(top10: List[Dict], headlines: List[Dict], trends: Dict, date_str
     <div style="line-height:2;">{tags_html or '<p style="color:#64748b;">No trending data yet.</p>'}</div>
   </div>
   <div style="text-align:center;padding:16px;color:#334155;font-size:12px;">
-    <p>You subscribed to Daily News Intelligence daily digest.</p>
+    <p>You subscribed to Dainik Vidya daily digest.</p>
     <a href="{unsub_url}" style="color:#475569;">Unsubscribe</a>
   </div>
 </body></html>"""
@@ -103,7 +103,7 @@ async def send_daily_digest() -> Dict:
         for user in subscribers:
             try:
                 msg = MIMEMultipart("alternative")
-                msg["Subject"] = f"📰 Daily News Intelligence — {date_str}"
+                msg["Subject"] = f"📰 Dainik Vidya — {date_str}"
                 msg["From"] = settings.from_email
                 msg["To"] = user["email"]
                 html = _build_html(top10_doc.get("items", []), headlines, trends_doc, date_str, user["email"])

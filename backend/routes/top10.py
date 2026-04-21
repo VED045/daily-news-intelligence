@@ -11,21 +11,22 @@ logger = get_logger()
 
 
 @router.get("")
-async def get_top10():
-    """Get today's top 10 AI-curated news stories."""
+async def get_top10(language: str = "en"):
+    """Get today's top 10 AI-curated news stories for a specific language."""
     try:
         collection = get_collection("top10")
         today = date.today().isoformat()
 
-        doc = await collection.find_one({"date": today})
+        doc = await collection.find_one({"date": today, "language": language})
         if not doc:
-            doc = await collection.find_one({}, sort=[("date", -1)])
+            doc = await collection.find_one({"language": language}, sort=[("date", -1)])
 
         if not doc:
             return {
                 "date": today,
+                "language": language,
                 "items": [],
-                "message": "Top 10 not yet generated. Trigger the pipeline or wait for the scheduler.",
+                "message": "Top 10 not yet generated for this language. Trigger the pipeline or wait for the scheduler.",
             }
 
         doc["_id"] = str(doc["_id"])

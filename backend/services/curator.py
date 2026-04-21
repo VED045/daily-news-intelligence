@@ -32,6 +32,7 @@ if not MOCK_MODE:
 
 CURATOR_PROMPT = """\
 You are a senior international news editor curating today's most important stories.
+Target Language: {language}
 Given today's headlines, select the {n} most globally significant stories.
 Prioritise: geopolitics, elections, economic crises, major world events.
 De-prioritise: celebrity, minor local sports.
@@ -39,9 +40,10 @@ De-prioritise: celebrity, minor local sports.
 CRITICAL RULES:
 1. ALWAYS return the EXACT original article URL from the input. Do NOT omit or modify it.
 2. The "title" field MUST be the EXACT original title — do NOT rewrite or shorten it.
-3. The "ai_title" is your compelling rewrite (max 15 words).
+3. The "ai_title" is your compelling rewrite (max 15 words) in the target language.
 4. Every item MUST have a valid "url" field.
 5. Every item MUST have an "importance_score" (integer 1-10).
+6. Prioritize articles in this language: {language}
 
 Return ONLY valid JSON (no markdown fences, no extra text):
 {{
@@ -167,14 +169,14 @@ def _validate_curated_items(items: list, original_articles: List[dict]) -> List[
     return validated
 
 
-async def _gemini_curate(articles: List[dict], n: int, preferred_topics: Optional[List[str]] = None) -> List[dict]:
+async def _gemini_curate(articles: List[dict], n: int, language: str = "en", preferred_topics: Optional[List[str]] = None) -> List[dict]:
     """Ask Gemini to pick the top-n stories. Falls back to mock on any error."""
     topic_instruction = ""
     if preferred_topics:
         topic_instruction = f"\nPrioritize these topics (in order of importance): {', '.join(preferred_topics)}\n"
 
     prompt = (
-        CURATOR_PROMPT.format(n=n, topic_instruction=topic_instruction)
+        CURATOR_PROMPT.format(n=n, language=language, topic_instruction=topic_instruction)
         + "\n\nToday's articles:\n"
         + _build_article_list(articles)
     )
@@ -206,30 +208,41 @@ async def _gemini_curate(articles: List[dict], n: int, preferred_topics: Optiona
 
 async def curate_top10() -> Dict:
     """Generate Top-20 for the curated_top10 collection.
-    Client-side slices to user preference (5/10/20)."""
+    Client-side slices to user preference (5/10/20).
+    Now grouped by language."""
     today = date.today().isoformat()
     top10_col = get_collection("top10")
-    articles = await _load_candidate_articles(80)
+    articles = await _load_candidate_articles(200)
 
     if not articles:
         return {}
 
+    from collections import defaultdict
+    articles_by_lang = defaultdict(list)
+    for art in articles:
+        lang = art.get("language", "en")
+        articles_by_lang[lang].append(art)
+
     n = 20  # Always generate top 20 internally
+    
+    results = {}
+    for lang, lang_articles in articles_by_lang.items():
+        logger.info(f"Curating Top {n} for lang={lang} | candidates={len(lang_articles)}")
 
-    logger.info(f"Curating Top {n} | candidates={len(articles)}")
-
-    # Check Gemini health before expensive call
-    if not MOCK_MODE:
-        healthy = await check_gemini_health()
-        if healthy:
-            items = await _gemini_curate(articles, n)
+        # Check Gemini health before expensive call
+        if not MOCK_MODE:
+            healthy = await check_gemini_health()
+            if healthy:
+                items = await _gemini_curate(lang_articles, n, lang)
+            else:
+                logger.warning("Gemini unhealthy, using fallback ranking")
+                items = _mock_items(lang_articles, n)
         else:
-            logger.warning("Gemini unhealthy, using fallback ranking")
-            items = _mock_items(articles, n)
-    else:
-        items = _mock_items(articles, n)
+            items = _mock_items(lang_articles, n)
 
-    doc = {"date": today, "items": items, "generated_at": datetime.now(timezone.utc)}
-    await top10_col.update_one({"date": today}, {"$set": doc}, upsert=True)
-    logger.info(f"Top {len(items)} curated | date={today}")
-    return doc
+        doc = {"date": today, "language": lang, "items": items, "generated_at": datetime.now(timezone.utc)}
+        await top10_col.update_one({"date": today, "language": lang}, {"$set": doc}, upsert=True)
+        results[lang] = doc
+        logger.info(f"Top {len(items)} curated | date={today} lang={lang}")
+    
+    return results

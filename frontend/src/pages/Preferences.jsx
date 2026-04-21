@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Settings, ChevronUp, ChevronDown, Save, Loader2, CheckCircle } from 'lucide-react'
+import { Settings, ChevronUp, ChevronDown, Save, Loader2, CheckCircle, Globe } from 'lucide-react'
 import { getMyPreferences, updateMyPreferences } from '../services/api'
-import { useTheme, useAuth } from '../App'
+import { useTheme, useAuth, useLanguage } from '../App'
 import toast from 'react-hot-toast'
 
 const ALL_TOPICS = [
@@ -22,13 +22,22 @@ const ALL_TOPICS = [
 
 const TOP_N_OPTIONS = [5, 10, 20]
 
+const LANGUAGES = [
+  { id: 'en', label: 'English', emoji: '🇬🇧' },
+  { id: 'hi', label: 'Hindi', emoji: '🇮🇳' },
+  { id: 'mr', label: 'Marathi', emoji: '🟠' },
+  { id: 'te', label: 'Telugu', emoji: '🟡' },
+]
+
 export default function Preferences() {
   const { dark } = useTheme()
   const { auth } = useAuth()
+  const { setLanguage } = useLanguage()
   const navigate = useNavigate()
 
   const [selectedTopics, setSelectedTopics] = useState([])
   const [topN, setTopN] = useState(10)
+  const [preferredLanguage, setPreferredLanguage] = useState('en')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -49,6 +58,7 @@ export default function Preferences() {
       const data = await getMyPreferences()
       setSelectedTopics(data.preferred_topics || [])
       setTopN(data.top_n_preference || 10)
+      setPreferredLanguage(data.preferred_language || 'en')
     } catch {
       toast.error('Could not load preferences')
     } finally {
@@ -85,7 +95,9 @@ export default function Preferences() {
       await updateMyPreferences({
         preferred_topics: selectedTopics,
         top_n_preference: topN,
+        preferred_language: preferredLanguage,
       })
+      setLanguage(preferredLanguage)
       toast.success('Preferences saved!')
       setSaved(true)
     } catch (err) {
@@ -145,6 +157,33 @@ export default function Preferences() {
                     }`}
                 >
                   Top {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Language selector */}
+          <div className={cardClass}>
+            <h2 className={`font-semibold text-sm mb-4 ${dark ? 'text-slate-200' : 'text-slate-700'}`}>
+              <Globe size={16} className="inline mr-2" /> Content Language
+            </h2>
+            <p className={`text-xs mb-4 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+              Choose your preferred language for news feeds.
+            </p>
+            <div className="flex gap-3">
+              {LANGUAGES.map(lang => (
+                <button
+                  key={lang.id}
+                  onClick={() => { setPreferredLanguage(lang.id); setSaved(false) }}
+                  className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-200 border
+                    ${preferredLanguage === lang.id
+                      ? 'bg-primary-500 text-white border-primary-500 shadow-lg shadow-primary-500/25'
+                      : dark
+                        ? 'bg-slate-800 text-slate-400 border-slate-700 hover:border-primary-500/50 hover:text-primary-400'
+                        : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-primary-300 hover:text-primary-600'
+                    }`}
+                >
+                  {lang.emoji} {lang.label}
                 </button>
               ))}
             </div>

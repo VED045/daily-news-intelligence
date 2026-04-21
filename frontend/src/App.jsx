@@ -17,6 +17,9 @@ export const useTheme = () => useContext(ThemeContext)
 export const AuthContext = createContext({ auth: null, setAuth: () => {} })
 export const useAuth = () => useContext(AuthContext)
 
+export const LanguageContext = createContext({ language: 'en', setLanguage: () => {} })
+export const useLanguage = () => useContext(LanguageContext)
+
 export const APP_NAME = 'Dainik-Vidya'
 export const APP_TAGLINE = 'AI-Powered News Intelligence'
 
@@ -30,12 +33,18 @@ export default function App() {
       return null
     }
   })
+  
+  const [language, setLanguage] = useState(() => localStorage.getItem('dv-lang') || 'en')
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
     localStorage.setItem('dv-theme', dark ? 'dark' : 'light')
     document.title = `${APP_NAME} — ${APP_TAGLINE}`
   }, [dark])
+
+  useEffect(() => {
+    localStorage.setItem('dv-lang', language)
+  }, [language])
 
   // Listen for token expiry events from api interceptor
   useEffect(() => {
@@ -47,7 +56,8 @@ export default function App() {
   return (
     <ThemeContext.Provider value={{ dark, toggle: () => setDark(d => !d) }}>
       <AuthContext.Provider value={{ auth, setAuth }}>
-        <div className={`min-h-screen transition-colors duration-300 ${
+        <LanguageContext.Provider value={{ language, setLanguage }}>
+          <div className={`min-h-screen transition-colors duration-300 ${
           dark ? 'bg-slate-950 text-slate-100' : 'bg-[#F8FAFC] text-[#1F2937]'
         }`}>
           <Router>
@@ -79,6 +89,7 @@ export default function App() {
             }}
           />
         </div>
+        </LanguageContext.Provider>
       </AuthContext.Provider>
     </ThemeContext.Provider>
   )
@@ -92,7 +103,7 @@ function Footer() {
         <span>
           <strong className="text-primary-500">Dainik-Vidya</strong> — AI-Powered News Intelligence
         </span>
-        <span>Sources: BBC · Reuters · The Hindu · ESPN · TOI · Moneycontrol · CNBC · Yahoo Finance</span>
+        <span>Sources: BBC · Reuters · NYT · 1stPost · Aaj Tak · Dainik Bhaskar · Lokmat · Sakal · Eenadu · Sakshi</span>
       </div>
     </footer>
   )

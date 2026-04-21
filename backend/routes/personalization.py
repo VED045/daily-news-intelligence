@@ -45,9 +45,9 @@ def _serialize(doc: dict) -> dict:
     doc["publishedAt"]     = doc.get("published_at")
     doc["imageUrl"]        = doc.get("image_url")
     doc["importanceScore"] = doc.get("importance_score")
-    raw_st = doc.get("source_type", "rss")
     doc["sourceType"] = "News API" if raw_st == "newsapi" else "Scraped"
     doc["contentPreview"]  = doc.get("content_preview", "")
+    doc["language"] = doc.get("language", "en")
     return doc
 
 
@@ -64,6 +64,7 @@ async def get_preferences(user: dict = Depends(get_current_user)):
         "preferred_topics": doc.get("preferred_topics", []),
         "top_n_preference": doc.get("top_n_preference", 10),
         "is_subscribed_email": doc.get("is_subscribed_email", True),
+        "preferred_language": doc.get("preferred_language", "en"),
     }
 
 
@@ -85,6 +86,11 @@ async def update_preferences(
         if body.top_n_preference not in (5, 10, 20):
             raise HTTPException(status_code=400, detail="top_n_preference must be 5, 10, or 20")
         updates["top_n_preference"] = body.top_n_preference
+
+    if body.preferred_language is not None:
+        if body.preferred_language not in ("en", "hi", "mr", "te"):
+            raise HTTPException(status_code=400, detail="Invalid language")
+        updates["preferred_language"] = body.preferred_language
 
     result = await users_col.update_one({"email": user["email"]}, {"$set": updates})
     if result.matched_count == 0:
@@ -137,9 +143,10 @@ async def get_personalized_feed(
     # Load user preferences
     user_doc = await users_col.find_one({"email": user["email"]})
     preferred = user_doc.get("preferred_topics", []) if user_doc else []
+    preferred_lang = user_doc.get("preferred_language", "en") if user_doc else "en"
 
     # Build query
-    query: dict = {}
+    query: dict = {"language": preferred_lang}
 
     # Date range filter
     if date_from:

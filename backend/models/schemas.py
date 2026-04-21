@@ -18,6 +18,7 @@ class ArticleResponse(BaseModel):
     ai_summary: Optional[str] = None
     keywords: List[str] = []
     image_url: Optional[str] = None
+    language: str = "en"
 
     class Config:
         populate_by_name = True
@@ -43,8 +44,12 @@ class Top10Response(BaseModel):
 
 class TrendData(BaseModel):
     date: str
+    language: str = "en"
     category_counts: Dict[str, int] = {}
     trending_keywords: List[Dict[str, Any]] = []
+    top_themes: List[str] = []
+    overview: Optional[str] = None
+    category_insights: Dict[str, str] = {}
     most_covered: str = "N/A"
     total_articles: int = 0
 
@@ -70,9 +75,11 @@ class BookmarkCreate(BaseModel):
 class PreferencesUpdate(BaseModel):
     preferred_topics: Optional[List[str]] = None
     top_n_preference: Optional[int] = None  # 5, 10, or 20
+    preferred_language: Optional[str] = None
 
 
 class PreferencesResponse(BaseModel):
     preferred_topics: List[str] = []
     top_n_preference: int = 10
     is_subscribed_email: bool = True
+    preferred_language: str = "en"

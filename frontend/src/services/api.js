@@ -35,7 +35,7 @@ export const signup = (email, password, name) =>
   api.post('/auth/signup', { email, password, name }).then(r => r.data)
 
 // ─── News ─────────────────────────────────────────────────────
-export const getNews = (category = '', page = 1, limit = 10, topic = '', filters = {}) =>
+export const getNews = (category = '', page = 1, limit = 10, topic = '', filters = {}, language = 'en') =>
   api.get('/news', { params: {
     category: category || undefined,
     page,
@@ -44,6 +44,7 @@ export const getNews = (category = '', page = 1, limit = 10, topic = '', filters
     date_from: filters.date_from || undefined,
     date_to: filters.date_to || undefined,
     source: filters.source || undefined,
+    language,
   }}).then(r => r.data)
 
 export const searchNews = (q, page = 1) =>
@@ -56,12 +57,12 @@ export const getCategoryCounts = (params = {}) =>
   api.get('/news/categories/counts', { params }).then(r => r.data)
 
 // ─── Top 10 ───────────────────────────────────────────────────
-export const getTop10 = () => api.get('/top10').then(r => r.data)
+export const getTop10 = (language = 'en') => api.get('/top10', { params: { language } }).then(r => r.data)
 
 // ─── Trends ──────────────────────────────────────────────────
-export const getTrends = () => api.get('/trends').then(r => r.data)
-export const getTrendHistory = (days = 7) =>
-  api.get('/trends/history', { params: { days } }).then(r => r.data)
+export const getTrends = (language = 'en') => api.get('/trends', { params: { language } }).then(r => r.data)
+export const getTrendHistory = (days = 7, language = 'en') =>
+  api.get('/trends/history', { params: { days, language } }).then(r => r.data)
 
 // ─── Subscription (legacy) ──────────────────────────────────
 export const subscribe = (email, name = '') =>

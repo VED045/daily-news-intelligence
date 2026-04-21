@@ -5,7 +5,7 @@ import { getTop10, getTrends, getMeta, getMyPreferences } from '../services/api'
 import Top10Card from '../components/Top10Card'
 import { Top10Skeleton, TrendSkeleton } from '../components/Skeleton'
 import { StatBar } from '../components/TrendChart'
-import { useTheme, useAuth } from '../App'
+import { useTheme, useAuth, useLanguage } from '../App'
 
 /** Returns a human-readable "X minutes ago" style string from an ISO timestamp. */
 function timeAgo(isoString) {
@@ -28,6 +28,7 @@ function timeAgo(isoString) {
 export default function Dashboard() {
   const { dark } = useTheme()
   const { auth } = useAuth()
+  const { language } = useLanguage()
   const navigate = useNavigate()
   const [top10, setTop10] = useState(null)
   const [trends, setTrends] = useState(null)
@@ -39,7 +40,7 @@ export default function Dashboard() {
   const load = async () => {
     setLoading(true); setError(null)
     try {
-      const promises = [getTop10(), getTrends(), getMeta()]
+      const promises = [getTop10(language), getTrends(language), getMeta()]
       // Load user pref for Top N if logged in
       if (auth) {
         promises.push(getMyPreferences().catch(() => null))
@@ -56,7 +57,7 @@ export default function Dashboard() {
     }
   }
 
-  useEffect(() => { load() }, []) // eslint-disable-line
+  useEffect(() => { load() }, [language]) // eslint-disable-line
 
   // Click a trending keyword → News Feed filtered by that topic
   const handleTopicClick = (word) => {
