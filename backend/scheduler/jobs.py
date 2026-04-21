@@ -4,12 +4,12 @@ Runs the full hybrid pipeline at:
   • 07:00 AM IST (morning edition)
   • 02:00 PM IST (afternoon edition)
 """
-import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from config import settings
+from core.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 _scheduler: AsyncIOScheduler = None
 
 

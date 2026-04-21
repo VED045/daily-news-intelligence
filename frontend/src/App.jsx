@@ -7,11 +7,15 @@ import NewsFeed from './pages/NewsFeed'
 import Trends from './pages/Trends'
 import Subscribe from './pages/Subscribe'
 import Bookmarks from './pages/Bookmarks'
+import Preferences from './pages/Preferences'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 
 export const ThemeContext = createContext({ dark: true, toggle: () => {} })
 export const useTheme = () => useContext(ThemeContext)
+
+export const AuthContext = createContext({ auth: null, setAuth: () => {} })
+export const useAuth = () => useContext(AuthContext)
 
 export const APP_NAME = 'Dainik-Vidya'
 export const APP_TAGLINE = 'AI-Powered News Intelligence'
@@ -33,39 +37,49 @@ export default function App() {
     document.title = `${APP_NAME} — ${APP_TAGLINE}`
   }, [dark])
 
+  // Listen for token expiry events from api interceptor
+  useEffect(() => {
+    const handler = () => setAuth(null)
+    window.addEventListener('auth-expired', handler)
+    return () => window.removeEventListener('auth-expired', handler)
+  }, [])
+
   return (
     <ThemeContext.Provider value={{ dark, toggle: () => setDark(d => !d) }}>
-      <div className={`min-h-screen transition-colors duration-300 ${
-        dark ? 'bg-slate-950 text-slate-100' : 'bg-[#F8FAFC] text-[#1F2937]'
-      }`}>
-        <Router>
-          <Navbar auth={auth} setAuth={setAuth} />
-          <main className="pt-16 min-h-screen">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/news" element={<NewsFeed />} />
-              <Route path="/bookmarks" element={<Bookmarks />} />
-              <Route path="/trends" element={<Trends />} />
-              <Route path="/subscribe" element={<Subscribe />} />
-              <Route path="/login" element={<Login setAuth={setAuth} />} />
-              <Route path="/signup" element={<Signup setAuth={setAuth} />} />
-            </Routes>
-          </main>
-          <Footer />
-        </Router>
-        <Toaster
-          position="bottom-right"
-          toastOptions={{
-            style: {
-              background: dark ? '#1e293b' : '#ffffff',
-              color: dark ? '#f1f5f9' : '#1F2937',
-              border: `1px solid ${dark ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.15)'}`,
-              borderRadius: '12px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-            },
-          }}
-        />
-      </div>
+      <AuthContext.Provider value={{ auth, setAuth }}>
+        <div className={`min-h-screen transition-colors duration-300 ${
+          dark ? 'bg-slate-950 text-slate-100' : 'bg-[#F8FAFC] text-[#1F2937]'
+        }`}>
+          <Router>
+            <Navbar />
+            <main className="pt-16 min-h-screen">
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/news" element={<NewsFeed />} />
+                <Route path="/bookmarks" element={<Bookmarks />} />
+                <Route path="/trends" element={<Trends />} />
+                <Route path="/subscribe" element={<Subscribe />} />
+                <Route path="/preferences" element={<Preferences />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+              </Routes>
+            </main>
+            <Footer />
+          </Router>
+          <Toaster
+            position="bottom-right"
+            toastOptions={{
+              style: {
+                background: dark ? '#1e293b' : '#ffffff',
+                color: dark ? '#f1f5f9' : '#1F2937',
+                border: `1px solid ${dark ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.15)'}`,
+                borderRadius: '12px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              },
+            }}
+          />
+        </div>
+      </AuthContext.Provider>
     </ThemeContext.Provider>
   )
 }

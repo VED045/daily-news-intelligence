@@ -16,14 +16,14 @@ Triggered by: /fetch-news endpoint (also /trigger-pipeline alias) and scheduler.
 Clean summary log emitted at the end of every run.
 """
 import asyncio
-import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Tuple
 
 from database import get_collection
 from config import settings
+from core.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 # ─── Priority constants ───────────────────────────────────────────────────────
 CATEGORY_PRIORITY: Dict[str, int] = {
@@ -175,7 +175,7 @@ async def run_full_pipeline() -> Dict:
         summary["scraped"] = rss.get("new_articles", 0)
         logger.info(f"     RSS: +{summary['scraped']} new articles")
     except Exception as e:
-        logger.error(f"     RSS scrape failed: {e}")
+        logger.exception("RSS scrape failed")
         summary["errors"].append(f"rss: {e}")
 
     # ── Step 2: NewsAPI fetch ─────────────────────────────────────
@@ -186,7 +186,7 @@ async def run_full_pipeline() -> Dict:
         summary["news_api"] = api.get("new", 0)
         logger.info(f"     NewsAPI: +{summary['news_api']} new articles")
     except Exception as e:
-        logger.error(f"     NewsAPI fetch failed: {e}")
+        logger.exception("NewsAPI fetch failed")
         summary["errors"].append(f"newsapi: {e}")
 
     summary["merged_total"] = summary["scraped"] + summary["news_api"]
@@ -198,7 +198,7 @@ async def run_full_pipeline() -> Dict:
         summary["deduplicated_removed"] = dedup.get("removed", 0)
         logger.info(f"     Removed {dedup['removed']} duplicates — {dedup['survived']} unique articles")
     except Exception as e:
-        logger.error(f"     Dedup failed: {e}")
+        logger.exception("Dedup failed")
         summary["errors"].append(f"dedup: {e}")
 
     # ── Step 4+5: Rank + AI process ───────────────────────────────
@@ -211,7 +211,7 @@ async def run_full_pipeline() -> Dict:
         summary["ai_failed"] = ai.get("errors", 0)
         logger.info(f"     AI done: ✅ {ai.get('processed', 0)}  ❌ {ai.get('errors', 0)}")
     except Exception as e:
-        logger.error(f"     AI processing failed: {e}")
+        logger.exception("AI processing failed")
         summary["errors"].append(f"ai: {e}")
 
     # ── Step 6: Curate ────────────────────────────────────────────
@@ -220,7 +220,7 @@ async def run_full_pipeline() -> Dict:
         from services.curator import curate_top10
         await curate_top10()
     except Exception as e:
-        logger.error(f"     Curation failed: {e}")
+        logger.exception("Curation failed")
         summary["errors"].append(f"curator: {e}")
 
     # ── Step 7: Trends ────────────────────────────────────────────
@@ -229,7 +229,7 @@ async def run_full_pipeline() -> Dict:
         from services.trends_service import compute_trends
         await compute_trends()
     except Exception as e:
-        logger.error(f"     Trends failed: {e}")
+        logger.exception("Trends failed")
         summary["errors"].append(f"trends: {e}")
 
     # ── Step 8: Update fetch metadata ─────────────────────────────
@@ -238,14 +238,14 @@ async def run_full_pipeline() -> Dict:
         from routes.meta import update_last_fetched
         await update_last_fetched()
     except Exception as e:
-        logger.warning(f"     Meta update failed (non-fatal): {e}")
+        logger.exception("Meta update failed (non-fatal)")
 
     # ── Step 9: Email ─────────────────────────────────────────────
     try:
         from services.email_service import send_daily_digest
         await send_daily_digest()
     except Exception as e:
-        logger.warning(f"     Email digest failed (non-fatal): {e}")
+        logger.exception("Email digest failed (non-fatal)")
 
     elapsed = round((datetime.now(timezone.utc) - run_start).total_seconds())
     summary["elapsed_seconds"] = elapsed
@@ -261,7 +261,7 @@ async def run_full_pipeline() -> Dict:
         f"failed={summary['ai_failed']}"
     )
     if summary["errors"]:
-        logger.warning(f"   Errors: {summary['errors']}")
+        logger.warning(f"Pipeline completed with errors | errors={summary['errors']}")
     logger.info("=" * 60)
 
     return summary

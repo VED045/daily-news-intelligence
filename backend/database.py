@@ -1,12 +1,11 @@
 """
 MongoDB async connection using Motor.
 """
-import logging
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import settings
+from core.logger import get_logger
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger()
 _client: AsyncIOMotorClient = None
 _db = None
 
@@ -29,9 +28,14 @@ async def connect_db():
         await _db["top10"].create_index("date", unique=True)
         await _db["trends"].create_index("date", unique=True)
         await _db["users"].create_index("email", unique=True)
+        await _db["bookmarks"].create_index(
+            [("user_id", 1), ("articleId", 1)], unique=True
+        )
+        await _db["news"].create_index("scraped_at")
+        await _db["news"].create_index("source")
         logger.info("✅ Indexes created")
     except Exception as e:
-        logger.error(f"❌ MongoDB connection failed: {e}")
+        logger.exception("MongoDB connection failed")
         raise
 
 

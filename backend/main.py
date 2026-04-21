@@ -2,21 +2,17 @@
 Dainik-Vidya — FastAPI Backend Entry Point
 """
 from contextlib import asynccontextmanager
-import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
+from core.logger import get_logger
 from config import settings
 from database import connect_db, close_db
-from routes import news, top10, trends, subscription, search, bookmarks, meta, auth
+from routes import news, top10, trends, subscription, search, bookmarks, meta, auth, personalization
+from routes.deps import get_current_user
 from scheduler.jobs import start_scheduler, stop_scheduler
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
-logger = logging.getLogger(__name__)
-
+logger = get_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,7 +28,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Dainik-Vidya API",
     description="Hybrid RSS + NewsAPI news aggregation with Gemini AI",
-    version="2.1.0",
+    version="3.0.0",
     lifespan=lifespan,
 )
 
@@ -49,24 +45,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router,         prefix="/auth",       tags=["Auth"])
-app.include_router(news.router,         prefix="/news",       tags=["News"])
-app.include_router(top10.router,        prefix="/top10",      tags=["Top 10"])
-app.include_router(trends.router,       prefix="/trends",     tags=["Trends"])
-app.include_router(subscription.router,                       tags=["Subscription"])
-app.include_router(search.router,       prefix="/search",     tags=["Search"])
-app.include_router(bookmarks.router,    prefix="/bookmark",   tags=["Bookmarks"])
-app.include_router(meta.router,         prefix="/meta",       tags=["Meta"])
+app.include_router(auth.router,             prefix="/auth",      tags=["Auth"])
+app.include_router(news.router,             prefix="/news",      tags=["News"])
+app.include_router(top10.router,            prefix="/top10",     tags=["Top 10"])
+app.include_router(trends.router,           prefix="/trends",    tags=["Trends"])
+app.include_router(subscription.router,                          tags=["Subscription"])
+app.include_router(search.router,           prefix="/search",    tags=["Search"])
+app.include_router(bookmarks.router,        prefix="/bookmark",  tags=["Bookmarks"])
+app.include_router(meta.router,             prefix="/meta",      tags=["Meta"])
+app.include_router(personalization.router,  prefix="/me",        tags=["Personalization"])
 
 
 @app.get("/", tags=["Health"])
 async def root():
-    return {"status": "ok", "app": "Dainik-Vidya", "version": "2.1.0"}
+    return {"status": "ok", "app": "Dainik-Vidya", "version": "3.0.0"}
 
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    return {"status": "healthy", "version": "2.1.0"}
+    return {"status": "healthy", "version": "3.0.0"}
 
 
 async def _run_pipeline_task():
@@ -110,9 +107,9 @@ async def pipeline_status():
         "unprocessed": unprocessed,
     }
 
-# Also expose GET /bookmarks (list all) at a clean path
+# Also expose GET /bookmarks (list all for current user) at a clean path
 @app.get("/bookmarks", tags=["Bookmarks"])
-async def get_bookmarks_alias():
-    """Alias: GET /bookmarks — returns all saved bookmarks."""
+async def get_bookmarks_alias(user: dict = Depends(get_current_user)):
+    """Alias: GET /bookmarks — returns current user's saved bookmarks."""
     from routes.bookmarks import get_bookmarks
-    return await get_bookmarks()
+    return await get_bookmarks(user=user)

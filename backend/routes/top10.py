@@ -3,11 +3,11 @@ Top 10 AI-curated articles route.
 """
 from fastapi import APIRouter, HTTPException
 from datetime import date
-import logging
 from database import get_collection
+from core.logger import get_logger
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 @router.get("")
@@ -33,6 +33,6 @@ async def get_top10():
             doc["generated_at"] = doc["generated_at"].isoformat()
         return doc
     except Exception as e:
-        logger.error(f"Error fetching top10: {e}")
+        logger.exception("Error fetching top10")
         raise HTTPException(status_code=500, detail=str(e))
 

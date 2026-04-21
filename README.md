@@ -1,6 +1,10 @@
-# 📰 Daily News Intelligence
+# 📰 Dainik-Vidya: Daily News Intelligence
 
-AI-powered news aggregation platform that automatically collects, summarises, and ranks daily headlines from **BBC, Reuters, The Hindu, ESPN, Times of India, and Moneycontrol** — with AI-curated Top 5, trending analytics, and email digests.
+![Dainik-Vidya Hero](frontend/src/assets/hero.png)
+
+AI-powered news aggregation platform that automatically collects, summarises, and ranks daily headlines from **BBC, Reuters, The Hindu, ESPN, Times of India, and Moneycontrol** — featuring AI-curated **Top 10** news, trending analytics, article bookmarking, and email digests.
+
+*(Powered by Google Gemini 1.5 Flash, NewsAPI, and BeautifulSoup)*
 
 ---
 
@@ -15,25 +19,39 @@ DailyNews/
 │   ├── models/schemas.py    # Pydantic models
 │   ├── routes/              # API route handlers
 │   │   ├── news.py          # GET /news
-│   │   ├── top5.py          # GET /top5
+│   │   ├── top10.py         # GET /top10 (AI Curated)
 │   │   ├── trends.py        # GET /trends
 │   │   ├── subscription.py  # POST /subscribe, DELETE /unsubscribe
-│   │   └── search.py        # GET /search
+│   │   ├── search.py        # GET /search
+│   │   ├── bookmarks.py     # GET/POST/DELETE /bookmarks
+│   │   ├── meta.py          # GET /meta (Last updated info)
+│   │   └── auth.py          # User authentication
 │   ├── services/
-│   │   ├── scraper.py       # RSS feed scraper
-│   │   ├── ai_processor.py  # OpenAI GPT-4o-mini
-│   │   ├── curator.py       # Top 5 AI curation
+│   │   ├── scraper.py       # RSS feed + BeautifulSoup scraper
+│   │   ├── ai_processor.py  # Google Gemini 1.5 Flash processing
+│   │   ├── curator.py       # Top 10 curation logic
 │   │   ├── trends_service.py# Trend analytics
 │   │   └── email_service.py # SMTP email digest
 │   └── scheduler/
 │       └── jobs.py          # APScheduler daily pipeline
 └── frontend/
     └── src/
-        ├── pages/           # Dashboard, NewsFeed, Trends, Subscribe
-        ├── components/      # NewsCard, Top5Card, Navbar, Charts...
+        ├── pages/           # Dashboard, NewsFeed, Trends, Bookmarks, Subscribe
+        ├── components/      # NewsCard, Top10Card, Navbar, Charts...
         ├── services/api.js  # Axios wrapper
         └── hooks/useNews.js # Infinite scroll hook
 ```
+
+---
+
+## ✨ Latest Features
+
+- **Gemini AI Integration**: Upgraded from OpenAI to `gemini-1.5-flash` for blazing-fast article summarization and intelligent ranking.
+- **Top 10 Expansion**: Expanded curated daily insights from Top 5 to Top 10.
+- **Enhanced Data Collection**: Hybrid pipeline using both **NewsAPI** and custom **RSS Scraping** alongside **BeautifulSoup** for full article content previews.
+- **Source Tracking**: Identifies if an article was sourced via API or Web Scraping.
+- **Bookmarking System**: Users can now save, view, and manage their favorite articles.
+- **Global Metadata Endpoint**: Display precise "Last updated" timestamps across the UI.
 
 ---
 
@@ -61,7 +79,7 @@ pip install -r requirements.txt
 
 # 3. Configure environment
 copy .env.example .env
-# Edit .env with your OpenAI key, SMTP credentials, etc.
+# Edit .env with your Gemini API key, NewsAPI key, SMTP credentials, etc.
 
 # 4. Start the API server
 uvicorn main:app --reload --port 8000
@@ -92,7 +110,8 @@ npm run dev
 | Variable | Description | Default |
 |---|---|---|
 | `MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017/dailynews` |
-| `OPENAI_API_KEY` | OpenAI API key (leave blank for mock mode) | — |
+| `GEMINI_API_KEY` | Google Gemini API key | — |
+| `NEWS_API_KEY` | NewsAPI key | — |
 | `SMTP_HOST` | SMTP server | `smtp.gmail.com` |
 | `SMTP_PORT` | SMTP port | `587` |
 | `SMTP_USER` | Gmail address | — |
@@ -102,8 +121,6 @@ npm run dev
 | `SCHEDULER_HOUR` | Pipeline run hour (IST) | `7` |
 | `SCHEDULER_MINUTE` | Pipeline run minute | `0` |
 
-> **Mock Mode**: If `OPENAI_API_KEY` is blank, the app runs without AI — raw headlines are shown instead of summaries.
-
 ---
 
 ## 🚀 API Reference
@@ -112,25 +129,27 @@ npm run dev
 |---|---|---|
 | `GET` | `/news` | Paginated articles (`?category=sports&page=1&limit=20`) |
 | `GET` | `/news/{id}` | Single article by ID |
-| `GET` | `/top5` | Today's AI Top 5 stories |
+| `GET` | `/top10` | Today's AI-curated Top 10 stories |
 | `GET` | `/trends` | Category counts + trending keywords |
 | `GET` | `/trends/history` | 7-day trend history |
 | `GET` | `/search?q=term` | Full-text article search |
+| `GET/POST`| `/bookmark` | Manage bookmarked articles |
+| `GET` | `/meta` | Global metadata and pipeline last run timestamps |
 | `POST` | `/subscribe` | Subscribe email `{ email, name }` |
 | `DELETE` | `/unsubscribe?email=` | Unsubscribe email |
-| `POST` | `/trigger-pipeline` | Manually run full pipeline |
+| `POST` | `/fetch-news` | Manually run full pipeline |
 
 ---
 
 ## 🤖 Running the Pipeline Manually
 
-Click **"Run Pipeline"** in the navbar, or call:
+Click **"Fetch Latest News"** in the navbar, or call:
 
 ```bash
-curl -X POST http://localhost:8000/trigger-pipeline
+curl -X POST http://localhost:8000/fetch-news
 ```
 
-This chains: **Scrape → AI Process → Curate Top 5 → Trends → Email Digest**
+This chains: **Scrape / Fetch API → Deduplicate → AI Process & Rank → Curate Top 10 → Trends → Email Digest**
 
 ---
 
@@ -189,8 +208,8 @@ The pipeline runs automatically at **7:00 AM IST** every day via APScheduler (ru
 |---|---|
 | Backend | Python + FastAPI |
 | Database | MongoDB (Motor async driver) |
-| Scraping | feedparser + requests + BeautifulSoup |
-| AI | OpenAI GPT-4o-mini |
+| Data Collection | NewsAPI + feedparser + BeautifulSoup |
+| AI | Google Gemini 1.5 Flash |
 | Scheduler | APScheduler |
 | Email | Python smtplib (SMTP) |
 | Frontend | React + Vite + Tailwind CSS |

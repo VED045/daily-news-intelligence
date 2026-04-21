@@ -18,13 +18,19 @@ const CATEGORIES = [
   { id: 'sports',       label: 'Sports' },
 ]
 
-export default function CategoryFilter({ active, onChange }) {
+export default function CategoryFilter({ active, onChange, counts }) {
   const { dark } = useTheme()
+
+  // If counts provided, filter out categories with 0 articles (except "all")
+  const visibleCategories = counts
+    ? CATEGORIES.filter(cat => cat.id === 'all' || (counts[cat.id] && counts[cat.id] > 0))
+    : CATEGORIES
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-      {CATEGORIES.map(cat => {
+      {visibleCategories.map(cat => {
         const isActive = active === cat.id
+        const count = counts?.[cat.id]
         return (
           <button
             key={cat.id}
@@ -38,6 +44,11 @@ export default function CategoryFilter({ active, onChange }) {
               }`}
           >
             {cat.label}
+            {count !== undefined && cat.id !== 'all' && (
+              <span className={`ml-1.5 text-xs ${isActive ? 'opacity-80' : 'opacity-50'}`}>
+                {count}
+              </span>
+            )}
           </button>
         )
       })}

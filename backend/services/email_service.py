@@ -2,15 +2,15 @@
 Email digest service: sends daily newsletter to all active subscribers via SMTP.
 """
 import smtplib
-import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime, date
 from typing import Dict, List
 from database import get_collection
 from config import settings
+from core.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 def _build_html(top10: List[Dict], headlines: List[Dict], trends: Dict, date_str: str, email: str) -> str:
@@ -111,12 +111,12 @@ async def send_daily_digest() -> Dict:
                 server.sendmail(settings.smtp_user, user["email"], msg.as_string())
                 sent += 1
             except Exception as e:
-                logger.error(f"Failed to send to {user['email']}: {e}")
+                logger.exception(f"Failed to send email | to={user['email']}")
                 errors += 1
         server.quit()
     except Exception as e:
-        logger.error(f"SMTP connection failed: {e}")
+        logger.exception("SMTP connection failed")
         return {"sent": 0, "error": str(e)}
 
-    logger.info(f"✅ Email digest: sent={sent}, errors={errors}")
+    logger.info(f"Email digest sent | sent={sent} errors={errors}")
     return {"sent": sent, "errors": errors}

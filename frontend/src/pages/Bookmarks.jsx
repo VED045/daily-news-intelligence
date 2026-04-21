@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
-import { Bookmark, Loader2, AlertTriangle, RefreshCw, Newspaper, Trash2 } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Bookmark, Loader2, AlertTriangle, RefreshCw, Newspaper } from 'lucide-react'
 import { getBookmarks } from '../services/api'
 import NewsCard from '../components/NewsCard'
-import { useTheme } from '../App'
+import { useTheme, useAuth } from '../App'
+import toast from 'react-hot-toast'
 
 function timeAgo(isoString) {
   if (!isoString) return null
@@ -20,11 +21,23 @@ function timeAgo(isoString) {
 
 export default function Bookmarks() {
   const { dark } = useTheme()
+  const { auth } = useAuth()
+  const navigate = useNavigate()
   const [articles, setArticles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  // Auth guard
+  useEffect(() => {
+    if (!auth) {
+      sessionStorage.setItem('redirectAfterLogin', 'bookmark')
+      toast('Please log in to view bookmarks', { icon: '🔒' })
+      navigate('/login')
+    }
+  }, [auth, navigate])
+
   const load = useCallback(async () => {
+    if (!auth) return
     setLoading(true)
     setError(null)
     try {
@@ -35,13 +48,15 @@ export default function Bookmarks() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [auth])
 
   useEffect(() => { load() }, [load])
 
   const handleUnbookmark = (articleId) => {
     setArticles(prev => prev.filter(a => a._id !== articleId))
   }
+
+  if (!auth) return null
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">

@@ -59,3 +59,20 @@ class NewsListResponse(BaseModel):
     total: int
     page: int
     has_more: bool
+
+
+# ── New schemas for personalization ──────────────────────────
+
+class BookmarkCreate(BaseModel):
+    articleId: str
+
+
+class PreferencesUpdate(BaseModel):
+    preferred_topics: Optional[List[str]] = None
+    top_n_preference: Optional[int] = None  # 5, 10, or 20
+
+
+class PreferencesResponse(BaseModel):
+    preferred_topics: List[str] = []
+    top_n_preference: int = 10
+    is_subscribed_email: bool = True

@@ -1,21 +1,44 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Newspaper, AlertTriangle, RefreshCw, Loader2, X } from 'lucide-react'
-import { getNews, searchNews } from '../services/api'
+import { useSearchParams } from 'react-router-dom'
+import { Newspaper, AlertTriangle, RefreshCw, Loader2, X, Filter, Sparkles } from 'lucide-react'
+import { getNews, searchNews, getMyFeed, getNewsSources, getCategoryCounts } from '../services/api'
 import NewsCard from '../components/NewsCard'
 import CategoryFilter from '../components/CategoryFilter'
 import SearchBar from '../components/SearchBar'
 import { CardSkeleton } from '../components/Skeleton'
-import { useTheme } from '../App'
+import { useTheme, useAuth } from '../App'
 
-const PAGE_SIZE = 10   // strict max 10 articles per page
+const PAGE_SIZE = 10
+
+const DATE_OPTIONS = [
+  { id: 'today',  label: 'Today' },
+  { id: '3days',  label: 'Last 3 Days' },
+  { id: '7days',  label: 'Last 7 Days' },
+]
+
+function getDateRange(option) {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const todayISO = today.toISOString().split('T')[0]
+
+  if (option === '3days') {
+    const d = new Date(today)
+    d.setDate(d.getDate() - 3)
+    return { date_from: d.toISOString().split('T')[0] }
+  }
+  if (option === '7days') {
+    const d = new Date(today)
+    d.setDate(d.getDate() - 7)
+    return { date_from: d.toISOString().split('T')[0] }
+  }
+  return {} // today — let backend use default
+}
 
 export default function NewsFeed() {
   const { dark } = useTheme()
-  const navigate = useNavigate()
+  const { auth } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // Read ?q= from URL (set by Dashboard trending click or direct link)
   const urlQuery = searchParams.get('q') || ''
 
   const [category, setCategory] = useState('all')
@@ -25,9 +48,33 @@ export default function NewsFeed() {
   const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [activeTopic, setActiveTopic] = useState(urlQuery)  // shown as chip
+  const [activeTopic, setActiveTopic] = useState(urlQuery)
 
-  // When URL ?q changes (e.g. from Dashboard), sync state
+  // Filters
+  const [dateFilter, setDateFilter] = useState('today')
+  const [sourceFilter, setSourceFilter] = useState('')
+  const [sources, setSources] = useState([])
+  const [categoryCounts, setCategoryCounts] = useState(null)
+  const [showFilters, setShowFilters] = useState(false)
+  const [usePersonalized, setUsePersonalized] = useState(!!auth)
+
+  // Load sources list once
+  useEffect(() => {
+    getNewsSources().then(d => setSources(d.sources || [])).catch(() => {})
+  }, [])
+
+  // Load category counts when date filter changes
+  useEffect(() => {
+    const range = getDateRange(dateFilter)
+    getCategoryCounts(range).then(d => setCategoryCounts(d.category_counts || {})).catch(() => {})
+  }, [dateFilter])
+
+  // Sync personalized toggle with auth
+  useEffect(() => {
+    setUsePersonalized(!!auth)
+  }, [auth])
+
+  // When URL ?q changes, sync state
   useEffect(() => {
     const q = searchParams.get('q') || ''
     setSearchQuery(q)
@@ -35,7 +82,7 @@ export default function NewsFeed() {
     setArticles([])
     setPage(1)
     setHasMore(true)
-  }, [urlQuery])  // eslint-disable-line
+  }, [urlQuery]) // eslint-disable-line
 
   const fetchArticles = useCallback(async (pg, cat, q) => {
     setLoading(true); setError(null)
@@ -43,8 +90,19 @@ export default function NewsFeed() {
       let data
       if (q && q.length >= 2) {
         data = await searchNews(q, pg)
+      } else if (auth && usePersonalized) {
+        const filters = { ...getDateRange(dateFilter) }
+        if (sourceFilter) filters.source = sourceFilter
+        data = await getMyFeed({
+          page: pg,
+          limit: PAGE_SIZE,
+          category: cat === 'all' ? undefined : cat,
+          ...filters,
+        })
       } else {
-        data = await getNews(cat === 'all' ? '' : cat, pg, PAGE_SIZE)
+        const filters = getDateRange(dateFilter)
+        if (sourceFilter) filters.source = sourceFilter
+        data = await getNews(cat === 'all' ? '' : cat, pg, PAGE_SIZE, '', filters)
       }
       setArticles(prev => pg === 1 ? data.articles : [...prev, ...data.articles])
       setHasMore(data.has_more)
@@ -53,9 +111,9 @@ export default function NewsFeed() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [auth, usePersonalized, dateFilter, sourceFilter])
 
-  // Fetch when page / category / query changes
+  // Fetch when page / category / query / filters change
   useEffect(() => {
     fetchArticles(page, category, searchQuery)
   }, [page, category, searchQuery, fetchArticles])
@@ -92,15 +150,23 @@ export default function NewsFeed() {
     setHasMore(true)
   }
 
+  const resetFilters = () => {
+    setDateFilter('today')
+    setSourceFilter('')
+    setArticles([])
+    setPage(1)
+    setHasMore(true)
+  }
+
   const clearTopic = () => {
     handleSearch('')
     setSearchParams({})
   }
 
-  // Keyword click on NewsCard → filter by that keyword
   const handleKeywordClick = (kw) => handleSearch(kw)
 
   const isSearchMode = !!searchQuery
+  const hasActiveFilters = dateFilter !== 'today' || sourceFilter
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -109,19 +175,88 @@ export default function NewsFeed() {
       <div className="mb-8 animate-fade-in">
         <div className={`flex items-center gap-2 font-semibold text-sm mb-2 text-primary-500`}>
           <Newspaper size={16} /> News Feed
+          {auth && usePersonalized && (
+            <span className="flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full text-xs bg-purple-500/15 text-purple-400 border border-purple-500/25">
+              <Sparkles size={10} /> Personalized
+            </span>
+          )}
         </div>
         <h1 className={`text-2xl sm:text-3xl font-extrabold tracking-tight mb-3 ${dark ? 'text-slate-100' : 'text-slate-800'}`}>
           Latest Headlines
         </h1>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <SearchBar onSearch={handleSearch} placeholder="Search articles… (press /)" />
-          {!isSearchMode && (
-            <button onClick={() => { setArticles([]); setPage(1); setHasMore(true) }} className="btn-ghost text-xs shrink-0">
-              <RefreshCw size={14} /> Refresh
+          <div className="flex items-center gap-2">
+            {!isSearchMode && (
+              <button onClick={() => { setArticles([]); setPage(1); setHasMore(true) }} className="btn-ghost text-xs shrink-0">
+                <RefreshCw size={14} /> Refresh
+              </button>
+            )}
+            <button
+              onClick={() => setShowFilters(f => !f)}
+              className={`btn-ghost text-xs shrink-0 ${showFilters || hasActiveFilters ? 'text-primary-500' : ''}`}
+            >
+              <Filter size={14} /> Filters {hasActiveFilters && '•'}
             </button>
-          )}
+            {auth && (
+              <button
+                onClick={() => { setUsePersonalized(p => !p); setArticles([]); setPage(1); setHasMore(true) }}
+                className={`btn-ghost text-xs shrink-0 ${usePersonalized ? 'text-purple-400' : ''}`}
+              >
+                <Sparkles size={14} /> {usePersonalized ? 'Default Feed' : 'My Feed'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Filter panel */}
+      {showFilters && !isSearchMode && (
+        <div className={`mb-6 rounded-2xl p-5 animate-fade-in ${dark ? 'glass' : 'bg-white border border-slate-200 shadow-sm'}`}>
+          <div className="flex flex-wrap items-end gap-4">
+            {/* Date filter */}
+            <div>
+              <label className={`block text-xs font-medium mb-1.5 ${dark ? 'text-slate-400' : 'text-slate-500'}`}>Date Range</label>
+              <div className="flex gap-2">
+                {DATE_OPTIONS.map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => { setDateFilter(opt.id); setArticles([]); setPage(1); setHasMore(true) }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                      dateFilter === opt.id
+                        ? 'bg-primary-500 text-white border-primary-500'
+                        : dark
+                          ? 'bg-slate-800 text-slate-400 border-slate-700 hover:border-primary-500/40'
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-primary-300'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Source filter */}
+            <div>
+              <label className={`block text-xs font-medium mb-1.5 ${dark ? 'text-slate-400' : 'text-slate-500'}`}>Source</label>
+              <select
+                value={sourceFilter}
+                onChange={(e) => { setSourceFilter(e.target.value); setArticles([]); setPage(1); setHasMore(true) }}
+                className={`px-3 py-1.5 rounded-lg text-xs border ${
+                  dark ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-white text-slate-700 border-slate-200'
+                }`}
+              >
+                <option value="">All Sources</option>
+                {sources.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            {hasActiveFilters && (
+              <button onClick={resetFilters} className="btn-ghost text-xs text-red-400">
+                <X size={12} /> Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Active topic chip */}
       {activeTopic && (
@@ -143,7 +278,7 @@ export default function NewsFeed() {
       {/* Category filter */}
       {!isSearchMode && (
         <div className="mb-6">
-          <CategoryFilter active={category} onChange={handleCategoryChange} />
+          <CategoryFilter active={category} onChange={handleCategoryChange} counts={categoryCounts} />
         </div>
       )}
 
@@ -157,7 +292,7 @@ export default function NewsFeed() {
         </div>
       )}
 
-      {/* Articles grid — strictly max 10 visible on screen */}
+      {/* Articles grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {loading && !articles.length
           ? [...Array(PAGE_SIZE)].map((_, i) => <CardSkeleton key={i} />)

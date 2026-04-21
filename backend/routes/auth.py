@@ -1,6 +1,7 @@
 """
 Authentication Route — Dainik-Vidya
 Handles Signup and Login with JWT and bcrypt.
+Sets is_subscribed_email=True on signup; backfills on login.
 """
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
@@ -43,14 +44,26 @@ async def signup(request: AuthRequest):
         "email": request.email,
         "name": request.name or "",
         "password": hashed_password,
-        "created_at": datetime.now(timezone.utc)
+        "is_subscribed_email": True,
+        "preferred_topics": [],
+        "top_n_preference": 10,
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
     }
     await users_col.insert_one(user_doc)
 
     access_token = create_access_token(
         data={"sub": request.email}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    return {"access_token": access_token, "token_type": "bearer", "user": {"email": request.email, "name": request.name}}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "email": request.email,
+            "name": request.name,
+            "is_subscribed_email": True,
+        },
+    }
 
 
 @router.post("/login")
@@ -63,7 +76,28 @@ async def login(request: AuthRequest):
     if not pwd_context.verify(request.password, user["password"]):
         raise HTTPException(status_code=400, detail="Invalid email or password")
 
+    # Backfill personalization fields for legacy users
+    updates = {}
+    if "is_subscribed_email" not in user:
+        updates["is_subscribed_email"] = True
+    if "preferred_topics" not in user:
+        updates["preferred_topics"] = []
+    if "top_n_preference" not in user:
+        updates["top_n_preference"] = 10
+    if updates:
+        updates["updated_at"] = datetime.now(timezone.utc)
+        await users_col.update_one({"_id": user["_id"]}, {"$set": updates})
+        user.update(updates)
+
     access_token = create_access_token(
         data={"sub": request.email}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    return {"access_token": access_token, "token_type": "bearer", "user": {"email": user["email"], "name": user.get("name", "")}}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "email": user["email"],
+            "name": user.get("name", ""),
+            "is_subscribed_email": user.get("is_subscribed_email", True),
+        },
+    }

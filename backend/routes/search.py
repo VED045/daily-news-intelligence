@@ -2,11 +2,11 @@
 Full-text search routes.
 """
 from fastapi import APIRouter, Query, HTTPException
-import logging
 from database import get_collection
+from core.logger import get_logger
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 @router.get("")
@@ -48,5 +48,5 @@ async def search_news(
             "has_more": (skip + limit) < total,
         }
     except Exception as e:
-        logger.error(f"Search error for '{q}': {e}")
+        logger.exception(f"Search error | q={q}")
         raise HTTPException(status_code=500, detail=str(e))

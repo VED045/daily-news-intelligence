@@ -2,13 +2,13 @@
 Metadata route — Dainik-Vidya
 GET /meta — returns last pipeline run time + total article count
 """
-import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter
 from database import get_collection
+from core.logger import get_logger
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 async def update_last_fetched():

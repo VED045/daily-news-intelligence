@@ -1,17 +1,19 @@
 """
 News articles API — Dainik-Vidya
-GET /news          → Top 10 priority-sorted articles (default)
-GET /news/{id}     → Single article
-Response includes importanceScore for frontend sorting.
+GET /news                    → Priority-sorted articles with date/source/topic filters
+GET /news/{id}               → Single article
+GET /news/sources            → Distinct source names
+GET /news/categories/counts  → Category counts (only where count > 0)
 """
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional, List
-import logging
+from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 from database import get_collection
+from core.logger import get_logger
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 # ── Priority lookup (matches pipeline.py) ──────────────────
 CATEGORY_PRIORITY = {
@@ -40,7 +42,7 @@ def _serialize(doc: dict) -> dict:
     # Alias publishedAt for frontend compatibility
     doc["publishedAt"]     = doc.get("published_at")
     doc["imageUrl"]        = doc.get("image_url")
-    doc["importanceScore"] = doc.get("importance_score")
+    doc["importanceScore"] = doc.get("importance_score") or 5
 
     # Source type: "News API" for newsapi.org articles, "Scraped" for RSS
     raw_st = doc.get("source_type", "rss")
@@ -76,20 +78,99 @@ def _apply_sports_cap(articles: List[dict], cap: int = MAX_SPORTS_IN_FEED) -> Li
     return result
 
 
+def _parse_date_range(date_from: Optional[str], date_to: Optional[str]):
+    """Parse date range strings into datetime objects. Returns (start, end) or (None, None)."""
+    if not date_from:
+        return None, None
+    try:
+        start = datetime.fromisoformat(date_from)
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None, None
+    if date_to:
+        try:
+            end = datetime.fromisoformat(date_to)
+            if end.tzinfo is None:
+                end = end.replace(tzinfo=timezone.utc)
+        except ValueError:
+            end = start + timedelta(days=1)
+    else:
+        end = start + timedelta(days=1)
+    return start, end
+
+
+@router.get("/sources")
+async def get_sources():
+    """Return distinct source names in the database."""
+    try:
+        collection = get_collection("news")
+        sources = await collection.distinct("source")
+        # Filter out empty strings
+        sources = [s for s in sources if s]
+        sources.sort()
+        return {"sources": sources}
+    except Exception as e:
+        logger.exception("get_sources error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/categories/counts")
+async def get_category_counts(
+    date_from: Optional[str] = Query(None, description="ISO date e.g. 2026-04-21"),
+    date_to: Optional[str] = Query(None),
+):
+    """Return {category: count} only for categories with count > 0."""
+    try:
+        collection = get_collection("news")
+        query: dict = {}
+
+        start, end = _parse_date_range(date_from, date_to)
+        if start and end:
+            query["scraped_at"] = {"$gte": start, "$lt": end}
+
+        pipeline = [
+            {"$match": query},
+            {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+            {"$match": {"count": {"$gt": 0}}},
+        ]
+        results = {}
+        async for doc in collection.aggregate(pipeline):
+            cat = doc["_id"]
+            if cat:
+                results[cat] = doc["count"]
+        return {"category_counts": results}
+    except Exception as e:
+        logger.exception("get_category_counts error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("")
 async def get_news(
     category: Optional[str] = Query(None),
     page:     int           = Query(1, ge=1),
     limit:    int           = Query(DEFAULT_LIMIT, ge=1, le=50),
     topic:    Optional[str] = Query(None, description="Filter by keyword/topic"),
+    date_from: Optional[str] = Query(None, description="ISO date e.g. 2026-04-21"),
+    date_to:  Optional[str] = Query(None),
+    source:   Optional[str] = Query(None, description="Filter by source name"),
 ):
     """
     Return priority-sorted news articles.
-    Default: top 10, sports capped at 1.
+    Supports date range, source, category, and topic filters.
     """
     try:
         collection = get_collection("news")
         query: dict = {}
+
+        # Date range filter
+        start, end = _parse_date_range(date_from, date_to)
+        if start and end:
+            query["scraped_at"] = {"$gte": start, "$lt": end}
+
+        # Source filter
+        if source:
+            query["source"] = {"$regex": source, "$options": "i"}
 
         if category and category.lower() not in ("all", ""):
             query["category"] = {"$regex": category, "$options": "i"}
@@ -136,7 +217,7 @@ async def get_news(
         }
 
     except Exception as e:
-        logger.error(f"get_news error: {e}")
+        logger.exception("get_news error")
         raise HTTPException(status_code=500, detail=str(e))
 
 

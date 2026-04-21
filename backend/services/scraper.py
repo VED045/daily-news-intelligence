@@ -13,13 +13,13 @@ Rules:
 import feedparser
 import requests
 import hashlib
-import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
 from bs4 import BeautifulSoup
 from database import get_collection
+from core.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 HEADERS = {
     "User-Agent": (
@@ -271,11 +271,11 @@ async def scrape_all_feeds() -> Dict[str, int]:
                 logger.info(f"  ✅ {source}: +{inserted} articles (running total: {global_new})")
 
         except requests.RequestException as e:
-            logger.warning(f"  ⚠️ {source} fetch failed: {e}")
+            logger.warning(f"Scrape fetch failed | source={source} details={e}")
             stats["errors"] += 1
         except Exception as e:
-            logger.error(f"  ❌ {source} error: {e}")
+            logger.exception(f"Scrape source error | source={source}")
             stats["errors"] += 1
 
-    logger.info(f"Scraping complete: {stats}")
+    logger.info(f"Scraping complete | stats={stats}")
     return stats

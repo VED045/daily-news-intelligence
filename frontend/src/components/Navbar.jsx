@@ -1,24 +1,18 @@
 import React, { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { useTheme, APP_NAME } from '../App'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useTheme, APP_NAME, useAuth } from '../App'
 import {
   Newspaper, BarChart3, Star, Mail, Bookmark,
-  Sun, Moon, Menu, X, Zap, RefreshCw, LogOut, LogIn
+  Sun, Moon, Menu, X, Zap, RefreshCw, LogOut, LogIn, Settings
 } from 'lucide-react'
 import { fetchLatestNews } from '../services/api'
 import toast from 'react-hot-toast'
 
-const NAV_LINKS = [
-  { to: '/',           label: 'Dashboard',  icon: Star },
-  { to: '/news',       label: 'News Feed',  icon: Newspaper },
-  { to: '/bookmarks',  label: 'Bookmarks',  icon: Bookmark },
-  { to: '/trends',     label: 'Trends',     icon: BarChart3 },
-  { to: '/subscribe',  label: 'Subscribe',  icon: Mail },
-]
-
-export default function Navbar({ auth, setAuth }) {
+export default function Navbar() {
   const { dark, toggle } = useTheme()
+  const { auth, setAuth } = useAuth()
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [running, setRunning] = useState(false)
 
@@ -48,6 +42,24 @@ export default function Navbar({ auth, setAuth }) {
     toast.success('Logged out successfully')
   }
 
+  // Guard for protected nav links
+  const guardedNav = (actionName, targetPath) => {
+    if (auth) {
+      navigate(targetPath)
+    } else {
+      sessionStorage.setItem('redirectAfterLogin', actionName)
+      toast('Please log in to continue', { icon: '🔒' })
+      navigate('/login')
+    }
+  }
+
+  // Public links (accessible to everyone)
+  const publicLinks = [
+    { to: '/',       label: 'Dashboard', icon: Star },
+    { to: '/news',   label: 'News Feed', icon: Newspaper },
+    { to: '/trends', label: 'Trends',    icon: BarChart3 },
+  ]
+
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 border-b ${bgClass}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -65,7 +77,7 @@ export default function Navbar({ auth, setAuth }) {
 
         {/* Desktop links */}
         <div className="hidden md:flex items-center gap-0.5">
-          {NAV_LINKS.map(({ to, label, icon: Icon }) => (
+          {publicLinks.map(({ to, label, icon: Icon }) => (
             <Link
               key={to}
               to={to}
@@ -75,6 +87,30 @@ export default function Navbar({ auth, setAuth }) {
               <Icon size={15} />{label}
             </Link>
           ))}
+          {/* Protected links */}
+          <button
+            onClick={() => guardedNav('bookmark', '/bookmarks')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200
+              ${pathname === '/bookmarks' ? linkActive : linkInactive}`}
+          >
+            <Bookmark size={15} />Bookmarks
+          </button>
+          <button
+            onClick={() => guardedNav('subscribe', '/subscribe')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200
+              ${pathname === '/subscribe' ? linkActive : linkInactive}`}
+          >
+            <Mail size={15} />Subscribe
+          </button>
+          {auth && (
+            <button
+              onClick={() => navigate('/preferences')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                ${pathname === '/preferences' ? linkActive : linkInactive}`}
+            >
+              <Settings size={15} />Preferences
+            </button>
+          )}
         </div>
 
         {/* Right controls */}
@@ -141,7 +177,7 @@ export default function Navbar({ auth, setAuth }) {
       {open && (
         <div className={`md:hidden border-t px-4 py-3 flex flex-col gap-1 animate-fade-in
           ${dark ? 'border-slate-800 bg-slate-950/95' : 'border-slate-200 bg-white/95'}`}>
-          {NAV_LINKS.map(({ to, label, icon: Icon }) => (
+          {publicLinks.map(({ to, label, icon: Icon }) => (
             <Link
               key={to} to={to}
               onClick={() => setOpen(false)}
@@ -151,6 +187,17 @@ export default function Navbar({ auth, setAuth }) {
               <Icon size={16} />{label}
             </Link>
           ))}
+          <button onClick={() => { guardedNav('bookmark', '/bookmarks'); setOpen(false) }} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium ${linkInactive}`}>
+            <Bookmark size={16} />Bookmarks
+          </button>
+          <button onClick={() => { guardedNav('subscribe', '/subscribe'); setOpen(false) }} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium ${linkInactive}`}>
+            <Mail size={16} />Subscribe
+          </button>
+          {auth && (
+            <Link to="/preferences" onClick={() => setOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium ${linkInactive}`}>
+              <Settings size={16} />Preferences
+            </Link>
+          )}
           <button onClick={handleTrigger} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium ${linkInactive}`}>
             <RefreshCw size={16} />Fetch Latest News
           </button>

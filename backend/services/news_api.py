@@ -5,14 +5,14 @@ Uses newsapi.org top-headlines + everything endpoints.
 """
 import requests
 import hashlib
-import logging
 import asyncio
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from database import get_collection
 from config import settings
+from core.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 NEWSAPI_BASE = "https://newsapi.org/v2"
 
 # Fetch config — each entry defines one API call
@@ -154,7 +154,7 @@ async def fetch_news_api() -> Dict[str, int]:
                 inserted = len(result.inserted_ids)
                 stats["new"] += inserted
                 total_new += inserted
-                logger.info(f"  ✅ NewsAPI [{cfg['our_cat']}]: +{inserted} articles")
+                logger.info(f"NewsAPI fetch success | category={cfg['our_cat']} articles_inserted={inserted}")
 
         except requests.RequestException as e:
             err_text = ""
@@ -163,10 +163,10 @@ async def fetch_news_api() -> Dict[str, int]:
                     err_text = f" | Response: {e.response.text}"
                 except Exception:
                     pass
-            logger.warning(f"  ⚠️ NewsAPI [{cfg.get('category', cfg.get('q', '?'))}]: {e}{err_text}")
+            logger.warning(f"NewsAPI error | category={cfg.get('category', cfg.get('q', '?'))} details={e}{err_text}")
             stats["errors"] += 1
         except Exception as e:
-            logger.error(f"  ❌ NewsAPI unexpected error: {e}")
+            logger.exception(f"NewsAPI unexpected error")
             stats["errors"] += 1
 
     return stats

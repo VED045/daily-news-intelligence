@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ExternalLink, Bookmark, BookmarkCheck, Tag, Clock, Rss, Globe } from 'lucide-react'
-import { useTheme } from '../App'
+import { useTheme, useAuth } from '../App'
 import { addBookmark, removeBookmarkByArticle } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -57,8 +58,12 @@ function formatTime(isoString) {
 
 export default function NewsCard({ article, onKeywordClick, bookmarkId: initialBookmarkId, onUnbookmark }) {
   const { dark } = useTheme()
+  const { auth } = useAuth()
+  const navigate = useNavigate()
+
   const [bookmarked, setBookmarked] = useState(() => {
     if (initialBookmarkId) return true
+    if (!auth) return false
     const saved = JSON.parse(localStorage.getItem('dv-bookmarks') || '{}')
     return !!saved[article._id || article.url]
   })
@@ -66,16 +71,27 @@ export default function NewsCard({ article, onKeywordClick, bookmarkId: initialB
 
   // Sync local storage bookmark map on mount
   useEffect(() => {
+    if (!auth) { setBookmarked(false); return }
     const saved = JSON.parse(localStorage.getItem('dv-bookmarks') || '{}')
     const key = article._id || article.url
     if (saved[key]) {
       setBookmarked(true)
       setBmId(saved[key])
     }
-  }, [article._id, article.url])
+  }, [article._id, article.url, auth])
 
   const toggleBookmark = async (e) => {
     e.preventDefault()
+
+    // Auth guard — redirect guests to login
+    if (!auth) {
+      sessionStorage.setItem('redirectAfterLogin', 'bookmark')
+      sessionStorage.setItem('pendingBookmarkId', article._id)
+      toast('Please log in to bookmark articles', { icon: '🔒' })
+      navigate('/login')
+      return
+    }
+
     const key = article._id || article.url
 
     if (bookmarked) {
@@ -108,12 +124,7 @@ export default function NewsCard({ article, onKeywordClick, bookmarkId: initialB
         setBookmarked(true)
         toast.success('Article bookmarked!')
       } catch {
-        // Fallback: save to localStorage only
-        const saved = JSON.parse(localStorage.getItem('dv-bookmarks') || '{}')
-        saved[key] = true
-        localStorage.setItem('dv-bookmarks', JSON.stringify(saved))
-        setBookmarked(true)
-        toast('Bookmarked (offline)')
+        toast.error('Could not bookmark — try again')
       }
     }
   }
@@ -163,7 +174,7 @@ export default function NewsCard({ article, onKeywordClick, bookmarkId: initialB
           <button
             onClick={toggleBookmark}
             className={`p-1.5 rounded-lg transition-colors ml-1 ${dark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
-            title={bookmarked ? 'Remove bookmark' : 'Bookmark this article'}
+            title={!auth ? 'Log in to bookmark' : bookmarked ? 'Remove bookmark' : 'Bookmark this article'}
           >
             {bookmarked
               ? <BookmarkCheck size={16} className="text-primary-500" />
@@ -172,7 +183,7 @@ export default function NewsCard({ article, onKeywordClick, bookmarkId: initialB
         </div>
       </div>
 
-      {/* Title — clickable link */}
+      {/* Title — clickable link (always shows original title) */}
       <h3 className={`font-semibold text-sm leading-snug line-clamp-2 transition-colors
         ${dark ? 'text-slate-100' : 'text-slate-800'}`}>
         <a

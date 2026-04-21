@@ -7,14 +7,14 @@ AI Processor — Dainik-Vidya (v2.1)
 """
 import json
 import asyncio
-import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from database import get_collection
 from config import settings
+from core.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 # ── Gemini initialisation ─────────────────────────────────────────────────────
 _gemini_ok   = False
@@ -94,12 +94,12 @@ def _init_gemini():
                 logger.debug(f"Gemini model '{candidate}' init failed: {e}")
                 continue
 
-        logger.error(f"Gemini: all model candidates failed. Last error: {last_err}")
+        logger.exception("Gemini: all model candidates failed.")
         logger.warning("Falling back to mock AI mode — pipeline will continue without summaries")
         MOCK_MODE = True
 
     except Exception as e:
-        logger.error(f"Gemini init error: {e} — mock mode active")
+        logger.exception("Gemini init error — mock mode active")
         MOCK_MODE = True
 
 
@@ -166,7 +166,7 @@ async def _call_gemini(article: dict) -> Optional[dict]:
         return None
     except Exception as e:
         # Suppress repetitive 404 / quota noise — log once at debug level
-        logger.debug(f"Gemini call failed: {type(e).__name__}: {e}")
+        logger.debug(f"Gemini call failed | error={type(e).__name__} details={e}")
         return None
 
 
@@ -214,8 +214,7 @@ async def process_articles(articles: List[dict]) -> Dict[str, int]:
     if not unprocessed:
         return stats
 
-    logger.info(f"  AI: processing {len(unprocessed)} articles "
-                f"(model={_ACTIVE_MODEL or 'mock'}, mock={MOCK_MODE})")
+    logger.info(f"AI processing started | count={len(unprocessed)} model={_ACTIVE_MODEL or 'mock'} mock={MOCK_MODE}")
 
     async def _handle(article: dict):
         try:
@@ -241,7 +240,7 @@ async def process_articles(articles: List[dict]) -> Dict[str, int]:
             )
             stats["processed"] += 1
         except Exception as e:
-            logger.debug(f"Article save error ({article.get('_id')}): {e}")
+            logger.exception(f"Article save error | article_id={article.get('_id')}")
             stats["errors"] += 1
 
     await asyncio.gather(*[_handle(a) for a in unprocessed])

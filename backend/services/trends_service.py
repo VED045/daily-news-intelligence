@@ -1,13 +1,13 @@
 """
 Trends analysis: computes category counts, keyword frequency, daily snapshots.
 """
-import logging
 from datetime import datetime, date
 from typing import Dict
 from collections import Counter
 from database import get_collection
+from core.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 STOP_WORDS = {
     "the", "a", "an", "is", "in", "on", "at", "to", "for", "of", "and", "or",
@@ -63,5 +63,5 @@ async def compute_trends() -> Dict:
         "computed_at": datetime.utcnow(),
     }
     await trends_col.update_one({"date": today}, {"$set": doc}, upsert=True)
-    logger.info(f"✅ Trends computed for {today}: {dict(category_counts)}")
+    logger.info(f"Trends computed | date={today} category_counts={dict(category_counts)}")
     return doc
