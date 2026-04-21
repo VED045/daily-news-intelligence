@@ -180,13 +180,12 @@ async def run_full_pipeline() -> Dict:
 
     # ── Step 2: NewsAPI fetch ─────────────────────────────────────
     try:
-        logger.info("🌐 [2/6] NewsAPI fetch...")
         from services.news_api import fetch_news_api
         api = await fetch_news_api()
-        summary["news_api"] = api.get("new", 0)
+        summary["news_api"] = api.get("news_api_count", 0)
         logger.info(f"     NewsAPI: +{summary['news_api']} new articles")
     except Exception as e:
-        logger.error("NewsAPI failed — using RSS only")
+        logger.error("❌ NewsAPI failed")
         summary["errors"].append(f"newsapi: {e}")
 
     summary["merged_total"] = summary["scraped"] + summary["news_api"]
@@ -236,7 +235,7 @@ async def run_full_pipeline() -> Dict:
     try:
         logger.info("🕒 [7/7] Updating fetch metadata...")
         from routes.meta import update_last_fetched
-        await update_last_fetched()
+        await update_last_fetched(summary["news_api"], summary["scraped"])
     except Exception as e:
         logger.exception("Meta update failed (non-fatal)")
 
@@ -252,10 +251,11 @@ async def run_full_pipeline() -> Dict:
 
     logger.info("=" * 60)
     logger.info(f"✅ Pipeline complete ({elapsed}s)")
+    logger.info(f"NewsAPI count: {summary['news_api']}")
+    logger.info(f"RSS count: {summary['scraped']}")
+
     logger.info(
-        f"   scraped={summary['scraped']} "
-        f"news_api={summary['news_api']} "
-        f"merged={summary['merged_total']} "
+        f"   merged={summary['merged_total']} "
         f"dedup_removed={summary['deduplicated_removed']} "
         f"ai_processed={summary['ai_processed']} "
         f"failed={summary['ai_failed']}"

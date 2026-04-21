@@ -59,6 +59,11 @@ def _serialize(doc: dict) -> dict:
     # ✅ FIX: define source_type safely
     raw_st = doc.get("source_type", "rss")
     doc["sourceType"] = "News API" if raw_st == "newsapi" else "Scraped"
+    
+    # Store timestamp for explicit sorting natively
+    pub = doc.get("published_at")
+    doc["published_at_timestamp"] = pub.timestamp() if hasattr(pub, "timestamp") else 0
+    doc["ai_used"] = doc.get("ai_used", False)
 
     return doc
 
@@ -189,16 +194,22 @@ async def get_personalized_feed(
 
     # Sorting
     if preferred:
+        logger.info(f"Language priority applied: {preferred_lang}")
         priority_map = {topic: i for i, topic in enumerate(preferred)}
 
         def sort_key(a):
-            p = priority_map.get(a.get("category", "general"), 999)
+            lang_priority = 0 if a.get("language") == preferred_lang else 1
+            topic_priority = priority_map.get(a.get("category"), 999)
             score = -(a.get("importanceScore") or 5)
-            return (p, score)
+            time = -(a.get("published_at_timestamp") or 0)
+            return (lang_priority, topic_priority, score, time)
 
         pool.sort(key=sort_key)
     else:
-        pool.sort(key=lambda a: -(a.get("importanceScore") or 5))
+        # NO filtering
+        pass
+
+    logger.info(f"Feed sorted | user={user['email']} | count={len(pool)}")
 
     # Sports cap
     result, sports_seen = [], 0

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Newspaper, AlertTriangle, RefreshCw, Loader2, X, Filter, Sparkles } from 'lucide-react'
-import { getNews, searchNews, getMyFeed, getNewsSources, getCategoryCounts } from '../services/api'
+import { getNews, searchNews, getMyFeed, getNewsSources, getCategoryCounts, getMeta } from '../services/api'
 import NewsCard from '../components/NewsCard'
 import CategoryFilter from '../components/CategoryFilter'
 import SearchBar from '../components/SearchBar'
@@ -77,10 +77,12 @@ export default function NewsFeed() {
   const [categoryCounts, setCategoryCounts] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [usePersonalized, setUsePersonalized] = useState(!!auth)
+  const [metaStats, setMetaStats] = useState(null)
 
   // Load sources list once
   useEffect(() => {
     getNewsSources().then(d => setSources(d.sources || [])).catch(() => {})
+    getMeta().then(m => setMetaStats(m)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -231,6 +233,15 @@ export default function NewsFeed() {
           </div>
         </div>
       </div>
+
+      {/* Meta Stats tracking UI */}
+      {metaStats && !isSearchMode && (
+        <div className="flex gap-4 mb-4 text-xs font-semibold animate-fade-in text-slate-500">
+           {metaStats.news_api_count > 0 && <span className="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-200">NewsAPI Articles: {metaStats.news_api_count}</span>}
+           {metaStats.rss_count > 0 && <span className="bg-orange-50 text-orange-600 px-2.5 py-1 rounded-full border border-orange-200">RSS Articles: {metaStats.rss_count}</span>}
+           {metaStats.news_api_count === 0 && <span className="bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full border border-slate-200">NewsAPI Count: 0</span>}
+        </div>
+      )}
 
       {/* Filter panel handled by Navbar on Desktop, but kept for non-navbar overrides or mobile */}
       {showFilters && !isSearchMode && (

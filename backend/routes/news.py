@@ -50,19 +50,23 @@ def _serialize(doc: dict) -> dict:
     # Content preview (5-6 lines of article body)
     doc["contentPreview"] = doc.get("content_preview", "")
     doc["language"] = doc.get("language", "en")
+    
+    pub = doc.get("published_at")
+    doc["published_at_timestamp"] = pub.timestamp() if hasattr(pub, "timestamp") else 0
+    doc["ai_used"] = doc.get("ai_used", False)
 
     return doc
 
 
-def _priority_sort(articles: List[dict]) -> List[dict]:
+def _priority_sort(articles: List[dict], preferred_lang: str) -> List[dict]:
     def key(a):
+        lang_priority = 0 if a.get("language") == preferred_lang else 1
         p = CATEGORY_PRIORITY.get(a.get("category", "general"), 10)
         # Secondary: importance score (higher = better, so negate)
         score = -(a.get("importance_score") or 5)
         # Tertiary: recency
-        pub = a.get("published_at")
-        ts = -(pub.timestamp() if hasattr(pub, "timestamp") else 0)
-        return (p, score, ts)
+        ts = -(a.get("published_at_timestamp") or 0)
+        return (lang_priority, p, score, ts)
     return sorted(articles, key=key)
 
 
@@ -220,11 +224,14 @@ async def get_news(
             .limit(pool_size)
         )
         pool = [_serialize(doc) async for doc in cursor]
-        sorted_pool  = _priority_sort(pool)
+        
+        logger.info(f"Language priority applied: {language}")
+        sorted_pool  = _priority_sort(pool, language)
         capped       = _apply_sports_cap(sorted_pool, MAX_SPORTS_IN_FEED)
         skip         = (page - 1) * limit
         page_items   = capped[skip: skip + limit]
 
+        logger.info(f"Feed sorted | user=anonymous | count={len(page_items)}")
         logger.info(f"Results count: {len(page_items)}")
 
         return {

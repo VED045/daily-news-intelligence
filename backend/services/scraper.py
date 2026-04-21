@@ -279,10 +279,12 @@ async def scrape_all_feeds() -> Dict[str, int]:
                     "summary": summary,
                     "content_preview": content_preview,  # 5-6 lines from <p> tags
                     "source_type": "rss",                # "rss" for all scraped articles
-                    "language": language,                # en, hi, mr, te
+                    "language": language or "en",        # en, hi, mr, te
                     "ai_title": None,
                     "ai_summary": None,
                     "keywords": [],
+                    "ai_used": False,
+                    "importance_score": 5,
                     "image_url": _extract_image(entry),
                     "is_sports": is_sports,
                     "processed": False,

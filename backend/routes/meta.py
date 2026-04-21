@@ -11,7 +11,7 @@ router = APIRouter()
 logger = get_logger()
 
 
-async def update_last_fetched():
+async def update_last_fetched(news_api_count: int = 0, rss_count: int = 0):
     """Called by pipeline after each successful run."""
     meta_col  = get_collection("metadata")
     news_col  = get_collection("news")
@@ -25,6 +25,8 @@ async def update_last_fetched():
             "lastFetchedAt": datetime.now(timezone.utc),
             "totalArticles": total,
             "processedArticles": processed,
+            "news_api_count": news_api_count,
+            "rss_count": rss_count,
         }},
         upsert=True,
     )
@@ -48,4 +50,6 @@ async def get_meta():
         "lastFetchedAt":     last_fetched,
         "totalArticles":     total,
         "processedArticles": doc.get("processedArticles", 0) if doc else 0,
+        "news_api_count":    doc.get("news_api_count", 0) if doc else 0,
+        "rss_count":         doc.get("rss_count", 0) if doc else 0,
     }

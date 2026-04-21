@@ -129,6 +129,7 @@ def _mock_items(articles: List[dict], n: int) -> List[dict]:
             "category": a.get("category", "general"),
             "keywords": a.get("keywords", []),
             "importance_score": a.get("importance_score") or 5,
+            "ai_used": False,
         }
         for i, a in enumerate(scored[:n])
         if a.get("url")  # NEVER include items without a URL
@@ -164,6 +165,7 @@ def _validate_curated_items(items: list, original_articles: List[dict]) -> List[
         if not isinstance(item.get("keywords"), list):
             item["keywords"] = []
 
+        item["ai_used"] = True
         validated.append(item)
 
     return validated
@@ -200,9 +202,10 @@ async def _gemini_curate(articles: List[dict], n: int, language: str = "en", pre
         return validated
     except json.JSONDecodeError as e:
         logger.warning(f"Gemini returned invalid JSON: {e}")
+        logger.warning("⚠️ Gemini FAILED — using fallback logic")
         return _mock_items(articles, n)
     except Exception as e:
-        logger.error("Gemini failed — using fallback")
+        logger.warning("⚠️ Gemini FAILED — using fallback logic")
         return _mock_items(articles, n)
 
 
@@ -233,9 +236,10 @@ async def curate_top10() -> Dict:
         if not MOCK_MODE:
             healthy = await check_gemini_health()
             if healthy:
+                logger.info("🤖 Gemini USED for curation")
                 items = await _gemini_curate(lang_articles, n, lang)
             else:
-                logger.warning("Gemini unhealthy, using fallback ranking")
+                logger.warning("⚠️ Gemini FAILED — using fallback logic")
                 items = _mock_items(lang_articles, n)
         else:
             items = _mock_items(lang_articles, n)

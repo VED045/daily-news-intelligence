@@ -116,6 +116,13 @@ export default function Navbar() {
               <Icon size={15} />{label}
             </Link>
           ))}
+          <button
+            onClick={() => guardedNav('bookmark', '/bookmarks')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200
+              ${pathname === '/bookmarks' ? linkActive : linkInactive}`}
+          >
+            <Bookmark size={15} />Bookmarks ⭐
+          </button>
         </div>
 
         {/* Right Section */}
@@ -220,7 +227,6 @@ export default function Navbar() {
                 ${dark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
                 {auth ? (
                   <>
-                    <button onClick={() => guardedNav('bookmark', '/bookmarks')} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'}`}><Bookmark size={15}/> Bookmarks</button>
                     <button onClick={() => guardedNav('preferences', '/preferences')} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'}`}><Settings size={15}/> Preferences</button>
                     <button onClick={() => guardedNav('subscribe', '/subscribe')} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'}`}><Mail size={15}/> Subscribe</button>
                     <button onClick={handleTrigger} disabled={running} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-primary-400 hover:bg-slate-800' : 'text-primary-600 hover:bg-slate-50'}`}><RefreshCw size={15} className={running ? 'animate-spin' : ''}/> {running ? 'Fetching...' : 'Fetch News'}</button>

@@ -221,10 +221,18 @@ async def process_articles(articles: List[dict]) -> Dict[str, int]:
             if MOCK_MODE:
                 result = _mock_process(article)
                 stats["mock"] += 1
+                ai_used = False
             else:
-                result = await _call_with_retry(article) or _mock_process(article)
-                if result == _mock_process(article):   # fallback was used
+                api_result = await _call_with_retry(article)
+                if api_result:
+                    logger.info("🤖 Gemini USED for curation")
+                    result = api_result
+                    ai_used = True
+                else:
+                    logger.warning("⚠️ Gemini FAILED — using fallback logic")
+                    result = _mock_process(article)
                     stats["mock"] += 1
+                    ai_used = False
 
             await collection.update_one(
                 {"_id": article["_id"]},
@@ -234,6 +242,7 @@ async def process_articles(articles: List[dict]) -> Dict[str, int]:
                     "category":        result.get("category", article.get("category", "general")),
                     "keywords":        result.get("keywords", []),
                     "importance_score": result.get("importance_score", 5),
+                    "ai_used":         ai_used,
                     "processed":       True,
                     "processed_at":    datetime.now(timezone.utc),
                 }},

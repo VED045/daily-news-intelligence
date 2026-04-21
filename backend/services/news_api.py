@@ -54,11 +54,12 @@ def _parse_dt(s: Optional[str]) -> datetime:
 async def fetch_news_api() -> Dict[str, int]:
     """Fetch articles from NewsAPI and insert new ones into MongoDB."""
     if not settings.news_api_key:
-        logger.warning("NEWS_API_KEY not set — skipping NewsAPI fetch")
-        return {"fetched": 0, "new": 0, "skipped": 0, "errors": 0}
+        logger.warning("⚠️ NewsAPI skipped (no key)")
+        return {"fetched": 0, "new": 0, "skipped": 0, "errors": 0, "news_api_used": False, "news_api_count": 0}
 
+    logger.info("🌐 NewsAPI CALLED")
     collection = get_collection("news")
-    stats = {"fetched": 0, "new": 0, "skipped": 0, "errors": 0}
+    stats = {"fetched": 0, "new": 0, "skipped": 0, "errors": 0, "news_api_used": True, "news_api_count": 0}
     total_new = 0
     cap = settings.max_news_api_articles
 
@@ -101,7 +102,7 @@ async def fetch_news_api() -> Dict[str, int]:
 
             if data.get("status") != "ok":
                 msg = data.get("message", "unknown error")
-                logger.warning(f"  ⚠️ NewsAPI [{cfg['our_cat']}] error: {msg}")
+                logger.error("❌ NewsAPI failed")
                 stats["errors"] += 1
                 continue
 
@@ -137,11 +138,14 @@ async def fetch_news_api() -> Dict[str, int]:
                     "category": cfg["our_cat"],
                     "published_at": _parse_dt(art.get("publishedAt")),
                     "summary": summary,
+                    "content_preview": summary[:300] if summary else "",
                     "ai_title": None,
                     "ai_summary": None,
                     "keywords": [],
+                    "ai_used": False,
+                    "language": "en",
                     "image_url": art.get("urlToImage"),
-                    "importance_score": None,
+                    "importance_score": 5,
                     "is_sports": cfg["our_cat"] == "sports",
                     "source_type": "newsapi",
                     "processed": False,
@@ -157,16 +161,11 @@ async def fetch_news_api() -> Dict[str, int]:
                 logger.info(f"NewsAPI fetch success | category={cfg['our_cat']} articles_inserted={inserted}")
 
         except requests.RequestException as e:
-            err_text = ""
-            if hasattr(e, 'response') and e.response is not None:
-                try:
-                    err_text = f" | Response: {e.response.text}"
-                except Exception:
-                    pass
-            logger.warning(f"NewsAPI error | category={cfg.get('category', cfg.get('q', '?'))} details={e}{err_text}")
+            logger.error("❌ NewsAPI failed")
             stats["errors"] += 1
         except Exception as e:
-            logger.exception(f"NewsAPI unexpected error")
+            logger.error("❌ NewsAPI failed")
             stats["errors"] += 1
 
+    stats["news_api_count"] = total_new
     return stats

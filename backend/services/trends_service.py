@@ -67,7 +67,8 @@ async def _generate_ai_trends(articles: List[dict], language: str) -> dict:
         return {
             "overview": "AI Summary not available. Today saw a variety of standard news coverage across multiple sectors. Key events remain developing.",
             "top_themes": ["General Headlines", "Varied News Coverage", "Daily Updates"],
-            "category_insights": {"general": "A mix of standard daily news."}
+            "category_insights": {"general": "A mix of standard daily news."},
+            "ai_used": False
         }
     
     # Take top ~40 articles for the prompt
@@ -84,17 +85,20 @@ async def _generate_ai_trends(articles: List[dict], language: str) -> dict:
             if text.startswith("json"):
                 text = text[4:]
         data = json.loads(text.strip())
+        logger.info("🤖 Gemini USED for curation")
         return {
             "overview": data.get("overview", "Overview unavailable."),
             "top_themes": data.get("top_themes", []),
-            "category_insights": data.get("category_insights", {})
+            "category_insights": data.get("category_insights", {}),
+            "ai_used": True
         }
     except Exception as e:
-        logger.error("Gemini failed — using fallback")
+        logger.warning("⚠️ Gemini FAILED — using fallback logic")
         return {
             "overview": "Trend generating... using basic summarization. Events are populated into categories.",
             "top_themes": [],
-            "category_insights": {}
+            "category_insights": {},
+            "ai_used": False
         }
 
 
@@ -154,6 +158,7 @@ async def compute_trends() -> Dict:
             "overview": ai_data["overview"],
             "top_themes": ai_data["top_themes"],
             "category_insights": ai_data["category_insights"],
+            "ai_used": ai_data.get("ai_used", False)
         }
         await trends_col.update_one({"date": today, "language": lang}, {"$set": doc}, upsert=True)
         results[lang] = doc
