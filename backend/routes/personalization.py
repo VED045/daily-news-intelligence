@@ -19,7 +19,7 @@ from database import get_collection
 from models.schemas import PreferencesUpdate
 from routes.deps import get_current_user
 from core.logger import get_logger
-from utils.timezone import IST, get_today_range_ist, ist_to_utc
+from utils.timezone import IST, get_today_range_ist, ist_to_utc, now_ist
 
 router = APIRouter()
 logger = get_logger()
