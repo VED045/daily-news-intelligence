@@ -15,16 +15,16 @@ export default function Navbar() {
   const { dateFilter, setDateFilter, specificDay, setSpecificDay, sourceFilter, setSourceFilter, category, setCategory } = useFilters()
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  
+
   const [open, setOpen] = useState(false)
   const [running, setRunning] = useState(false)
-  
+
   // Dropdowns
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  
+
   const [sources, setSources] = useState([])
-  useEffect(() => { getNewsSources().then(d => setSources(d.sources || [])).catch(() => {}) }, [])
+  useEffect(() => { getNewsSources().then(d => setSources(d.sources || [])).catch(() => { }) }, [])
 
   // Auto-close dropdowns on click outside
   const navRef = useRef(null)
@@ -43,7 +43,7 @@ export default function Navbar() {
     ? 'bg-slate-950/80 border-slate-800/60 backdrop-blur-md'
     : 'bg-white/90 border-slate-200 backdrop-blur-md shadow-sm'
 
-  const linkActive   = dark ? 'bg-primary-500/15 text-primary-400' : 'bg-primary-50 text-primary-600'
+  const linkActive = dark ? 'bg-primary-500/15 text-primary-400' : 'bg-primary-50 text-primary-600'
   const linkInactive = dark ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
 
   const handleTrigger = async () => {
@@ -78,15 +78,15 @@ export default function Navbar() {
   }
 
   const publicLinks = [
-    { to: '/',       label: 'Dashboard', icon: Star },
-    { to: '/news',   label: 'News Feed', icon: Newspaper },
-    { to: '/trends', label: 'Trends',    icon: BarChart3 },
+    { to: '/', label: 'Dashboard', icon: Star },
+    { to: '/news', label: 'News Feed', icon: Newspaper },
+    { to: '/trends', label: 'Trends', icon: BarChart3 },
   ]
 
   const DATE_OPTIONS = [
-    { id: 'today',  label: 'Today' },
-    { id: '3days',  label: 'Last 3 Days' },
-    { id: '7days',  label: 'Last 7 Days' },
+    { id: 'today', label: 'Today' },
+    { id: '3days', label: 'Last 3 Days' },
+    { id: '7days', label: 'Last 7 Days' },
   ]
 
   return (
@@ -121,13 +121,13 @@ export default function Navbar() {
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200
               ${pathname === '/bookmarks' ? linkActive : linkInactive}`}
           >
-            <Bookmark size={15} />Bookmarks ⭐
+            <Bookmark size={15} />Bookmarks
           </button>
         </div>
 
         {/* Right Section */}
         <div className="flex items-center gap-2 relative">
-          
+
           {/* 3. Filters Dropdown */}
           <div className="relative">
             <button
@@ -135,7 +135,7 @@ export default function Navbar() {
               className={`hidden md:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200
                 ${filtersOpen || sourceFilter || dateFilter !== 'today' || category !== 'all' ? linkActive : linkInactive}`}
             >
-              <Filter size={15} /> Filters <ChevronDown size={14} className={`transition-transform ${filtersOpen ? 'rotate-180' : ''}`}/>
+              <Filter size={15} /> Filters <ChevronDown size={14} className={`transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
             </button>
             {filtersOpen && (
               <div className={`absolute top-full right-0 mt-2 w-72 rounded-xl shadow-xl overflow-hidden border p-4 z-50 animate-slide-up
@@ -147,13 +147,12 @@ export default function Navbar() {
                       <button
                         key={opt.id}
                         onClick={() => { setDateFilter(opt.id); setSpecificDay('') }}
-                        className={`px-2 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                          dateFilter === opt.id
+                        className={`px-2 py-1.5 rounded-lg text-xs font-medium border transition-all ${dateFilter === opt.id
                             ? 'bg-primary-500 text-white border-primary-500'
                             : dark
                               ? 'bg-slate-800 text-slate-400 border-slate-700 hover:border-primary-500/40'
                               : 'bg-white text-slate-500 border-slate-200 hover:border-primary-300'
-                        }`}
+                          }`}
                       >
                         {opt.label}
                       </button>
@@ -176,9 +175,8 @@ export default function Navbar() {
                   <select
                     value={sourceFilter}
                     onChange={(e) => setSourceFilter(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg text-xs border focus:outline-none mb-2 ${
-                      dark ? 'bg-slate-800 text-slate-300 border-slate-700 focus:border-primary-500' : 'bg-slate-50 text-slate-700 border-slate-200 focus:border-primary-400'
-                    }`}
+                    className={`w-full px-3 py-2 rounded-lg text-xs border focus:outline-none mb-2 ${dark ? 'bg-slate-800 text-slate-300 border-slate-700 focus:border-primary-500' : 'bg-slate-50 text-slate-700 border-slate-200 focus:border-primary-400'
+                      }`}
                   >
                     <option value="">All Sources</option>
                     {sources.map(s => <option key={s} value={s}>{s}</option>)}
@@ -192,9 +190,8 @@ export default function Navbar() {
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            className={`cursor-pointer w-[4.5rem] h-9 px-2 flex items-center justify-center rounded-lg transition-all text-xs font-bold uppercase ${
-              dark ? 'bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200'
-            }`}
+            className={`cursor-pointer w-[4.5rem] h-9 px-2 flex items-center justify-center rounded-lg transition-all text-xs font-bold uppercase ${dark ? 'bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200'
+              }`}
             title="Language"
           >
             <option value="en">EN</option>
@@ -202,7 +199,7 @@ export default function Navbar() {
             <option value="mr">MR</option>
             <option value="te">TE</option>
           </select>
-          
+
           <button
             onClick={toggle}
             className={`hidden md:flex w-9 h-9 items-center justify-center rounded-lg transition-all
@@ -227,17 +224,17 @@ export default function Navbar() {
                 ${dark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
                 {auth ? (
                   <>
-                    <button onClick={() => guardedNav('preferences', '/preferences')} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'}`}><Settings size={15}/> Preferences</button>
-                    <button onClick={() => guardedNav('subscribe', '/subscribe')} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'}`}><Mail size={15}/> Subscribe</button>
-                    <button onClick={handleTrigger} disabled={running} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-primary-400 hover:bg-slate-800' : 'text-primary-600 hover:bg-slate-50'}`}><RefreshCw size={15} className={running ? 'animate-spin' : ''}/> {running ? 'Fetching...' : 'Fetch News'}</button>
+                    <button onClick={() => guardedNav('preferences', '/preferences')} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'}`}><Settings size={15} /> Preferences</button>
+                    <button onClick={() => guardedNav('subscribe', '/subscribe')} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'}`}><Mail size={15} /> Subscribe</button>
+                    <button onClick={handleTrigger} disabled={running} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-primary-400 hover:bg-slate-800' : 'text-primary-600 hover:bg-slate-50'}`}><RefreshCw size={15} className={running ? 'animate-spin' : ''} /> {running ? 'Fetching...' : 'Fetch News'}</button>
                     <div className={`border-t my-1 ${dark ? 'border-slate-800' : 'border-slate-100'}`} />
-                    <button onClick={handleLogout} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20`}><LogOut size={15}/> Logout</button>
+                    <button onClick={handleLogout} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20`}><LogOut size={15} /> Logout</button>
                   </>
                 ) : (
                   <>
-                    <button onClick={handleTrigger} disabled={running} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-primary-400 hover:bg-slate-800' : 'text-primary-600 hover:bg-slate-50'}`}><RefreshCw size={15} className={running ? 'animate-spin' : ''}/> {running ? 'Fetching...' : 'Fetch News'}</button>
+                    <button onClick={handleTrigger} disabled={running} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-primary-400 hover:bg-slate-800' : 'text-primary-600 hover:bg-slate-50'}`}><RefreshCw size={15} className={running ? 'animate-spin' : ''} /> {running ? 'Fetching...' : 'Fetch News'}</button>
                     <div className={`border-t my-1 ${dark ? 'border-slate-800' : 'border-slate-100'}`} />
-                    <button onClick={() => guardedNav('login', '/login')} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'}`}><LogIn size={15}/> Login</button>
+                    <button onClick={() => guardedNav('login', '/login')} className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${dark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'}`}><LogIn size={15} /> Login</button>
                   </>
                 )}
               </div>
